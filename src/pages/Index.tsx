@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Web3Provider } from '@/contexts/Web3Context';
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
 import { Dashboard } from '@/components/Dashboard';
@@ -32,17 +33,19 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background grid-pattern">
-      <Header />
-      <div className="flex">
-        <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
-        <main className="flex-1 p-6 overflow-auto">
-          <div className="max-w-7xl mx-auto">
-            {renderContent()}
-          </div>
-        </main>
+    <Web3Provider>
+      <div className="min-h-screen bg-background grid-pattern">
+        <Header />
+        <div className="flex">
+          <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+          <main className="flex-1 p-6 overflow-auto">
+            <div className="max-w-7xl mx-auto">
+              {renderContent()}
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </Web3Provider>
   );
 };
 
