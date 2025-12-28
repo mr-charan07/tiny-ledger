@@ -6,7 +6,9 @@ import {
   Cpu, 
   Shield, 
   Activity,
-  FileText
+  FileText,
+  Database,
+  CheckCircle
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -16,6 +18,8 @@ interface SidebarProps {
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'record', label: 'Record Data', icon: Database },
+  { id: 'verify', label: 'Verification', icon: CheckCircle },
   { id: 'blocks', label: 'Blocks', icon: Box },
   { id: 'nodes', label: 'Nodes', icon: Server },
   { id: 'devices', label: 'IoT Devices', icon: Cpu },

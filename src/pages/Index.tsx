@@ -7,6 +7,8 @@ import { BlocksView } from '@/components/BlocksView';
 import { NodesView } from '@/components/NodesView';
 import { DevicesView } from '@/components/DevicesView';
 import { PermissionsView } from '@/components/PermissionsView';
+import { RecordDataForm } from '@/components/RecordDataForm';
+import { VerificationView } from '@/components/VerificationView';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -15,6 +17,10 @@ const Index = () => {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard />;
+      case 'record':
+        return <RecordDataForm />;
+      case 'verify':
+        return <VerificationView />;
       case 'blocks':
         return <BlocksView />;
       case 'nodes':
