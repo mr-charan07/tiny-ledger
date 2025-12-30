@@ -1,5 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Contract, keccak256, toUtf8Bytes } from 'ethers';
+import {
+  Contract,
+  keccak256,
+  toUtf8Bytes,
+  encodeBytes32String,
+  decodeBytes32String,
+} from 'ethers';
 import { useWeb3 } from '@/contexts/Web3Context';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/config/blockchain';
 import { toast } from 'sonner';
@@ -7,8 +13,8 @@ import type { Block, IoTDevice, Node, IoTTransaction, BlockchainStats } from '@/
 
 interface ContractDevice {
   deviceAddress: string;
-  name: string;
-  deviceType: string;
+  name: string; // bytes32
+  deviceType: string; // bytes32
   isActive: boolean;
   registeredAt: bigint;
   transactionCount: bigint;
@@ -17,7 +23,7 @@ interface ContractDevice {
 
 interface ContractNode {
   nodeAddress: string;
-  name: string;
+  name: string; // bytes32
   isValidator: boolean;
   isActive: boolean;
   blocksValidated: bigint;
@@ -27,8 +33,8 @@ interface ContractNode {
 interface ContractDataRecord {
   id: bigint;
   deviceAddress: string;
-  deviceName: string;
-  dataType: string;
+  deviceName: string; // bytes32
+  dataType: string; // bytes32
   value: bigint;
   timestamp: bigint;
   signature: string;
@@ -40,8 +46,27 @@ const permissionMap: Record<number, 'read' | 'write' | 'admin'> = {
   2: 'admin',
 };
 
+const safeDecodeBytes32 = (value: string) => {
+  try {
+    return decodeBytes32String(value);
+  } catch {
+    return value;
+  }
+};
+
+const safeEncodeBytes32 = (label: string, value: string) => {
+  try {
+    return encodeBytes32String(value);
+  } catch {
+    toast.error(`${label} is too long`, {
+      description: 'Must be 31 characters or fewer (required for compact on-chain storage).',
+    });
+    return null;
+  }
+};
+
 export function useBlockchain() {
-  const { provider, signer, isConnected, isCorrectNetwork } = useWeb3();
+  const { provider, signer, isCorrectNetwork } = useWeb3();
   const [contract, setContract] = useState<Contract | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [devices, setDevices] = useState<IoTDevice[]>([]);
@@ -63,11 +88,7 @@ export function useBlockchain() {
       return;
     }
 
-    const contractInstance = new Contract(
-      CONTRACT_ADDRESS,
-      CONTRACT_ABI,
-      signer || provider
-    );
+    const contractInstance = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer || provider);
     setContract(contractInstance);
     setIsContractDeployed(true);
   }, [provider, signer, isCorrectNetwork]);
@@ -79,36 +100,43 @@ export function useBlockchain() {
     setIsLoading(true);
     try {
       // Fetch stats
-      const [totalData, totalDevices, totalNodes, activeDevices, activeNodes] = 
-        await contract.getStats();
-      
+      const [totalData, totalDevices, totalNodes, activeDevices, activeNodes] = await contract.getStats();
+
       setStats({
         totalBlocks: Number(totalData),
         totalTransactions: Number(totalData),
         activeNodes: Number(activeNodes),
         activeDevices: Number(activeDevices),
-        avgBlockTime: 12, // Ethereum average block time
-        storageUsed: Number(totalData) * 0.001, // Approximate
+        avgBlockTime: 12,
+        storageUsed: Number(totalData) * 0.001,
       });
 
       // Fetch devices
       const contractDevices: ContractDevice[] = await contract.getAllDevices();
-      const mappedDevices: IoTDevice[] = contractDevices.map((d) => ({
-        id: d.deviceAddress,
-        name: d.name,
-        type: d.deviceType as 'sensor' | 'actuator' | 'gateway',
-        status: d.isActive ? 'online' : 'offline',
-        lastReading: new Date(Number(d.registeredAt) * 1000),
-        transactionCount: Number(d.transactionCount),
-        permission: permissionMap[d.permission] || 'read',
-      }));
+      const mappedDevices: IoTDevice[] = contractDevices.map((d) => {
+        const decodedName = safeDecodeBytes32(d.name);
+        const decodedType = safeDecodeBytes32(d.deviceType);
+        const normalizedType = (['sensor', 'actuator', 'gateway'] as const).includes(decodedType as any)
+          ? (decodedType as 'sensor' | 'actuator' | 'gateway')
+          : 'sensor';
+
+        return {
+          id: d.deviceAddress,
+          name: decodedName,
+          type: normalizedType,
+          status: d.isActive ? 'online' : 'offline',
+          lastReading: new Date(Number(d.registeredAt) * 1000),
+          transactionCount: Number(d.transactionCount),
+          permission: permissionMap[d.permission] || 'read',
+        };
+      });
       setDevices(mappedDevices);
 
       // Fetch nodes
       const contractNodes: ContractNode[] = await contract.getAllNodes();
       const mappedNodes: Node[] = contractNodes.map((n) => ({
         id: n.nodeAddress,
-        name: n.name,
+        name: safeDecodeBytes32(n.name),
         address: n.nodeAddress,
         status: n.isActive ? 'active' : 'inactive',
         role: n.isValidator ? 'validator' : 'observer',
@@ -121,14 +149,19 @@ export function useBlockchain() {
       const dataCount = Number(totalData);
       if (dataCount > 0) {
         const recentData: ContractDataRecord[] = await contract.getRecentData(Math.min(dataCount, 10));
-        const mappedTransactions: IoTTransaction[] = recentData.map((d) => ({
-          id: `tx-${d.id.toString()}`,
-          deviceId: d.deviceAddress,
-          deviceName: d.deviceName,
-          data: { [d.dataType]: Number(d.value) },
-          timestamp: new Date(Number(d.timestamp) * 1000),
-          signature: d.signature.slice(0, 18),
-        }));
+        const mappedTransactions: IoTTransaction[] = recentData.map((d) => {
+          const deviceName = safeDecodeBytes32(d.deviceName);
+          const dataType = safeDecodeBytes32(d.dataType);
+
+          return {
+            id: `tx-${d.id.toString()}`,
+            deviceId: d.deviceAddress,
+            deviceName,
+            data: { [dataType]: Number(d.value) },
+            timestamp: new Date(Number(d.timestamp) * 1000),
+            signature: d.signature.slice(0, 18),
+          };
+        });
         setTransactions(mappedTransactions);
       }
     } catch (error) {
@@ -146,93 +179,100 @@ export function useBlockchain() {
   }, [isContractDeployed, fetchData]);
 
   // Register a device
-  const registerDevice = useCallback(async (
-    deviceAddress: string,
-    name: string,
-    deviceType: string,
-    permission: number
-  ) => {
-    if (!contract || !signer) {
-      toast.error('Wallet not connected');
-      return false;
-    }
+  const registerDevice = useCallback(
+    async (deviceAddress: string, name: string, deviceType: string, permission: number) => {
+      if (!contract || !signer) {
+        toast.error('Wallet not connected');
+        return false;
+      }
 
-    try {
-      setIsLoading(true);
-      const tx = await contract.registerDevice(deviceAddress, name, deviceType, permission);
-      toast.info('Transaction submitted', { description: 'Waiting for confirmation...' });
-      await tx.wait();
-      toast.success('Device registered successfully');
-      await fetchData();
-      return true;
-    } catch (error: unknown) {
-      console.error('Error registering device:', error);
-      const err = error as { reason?: string };
-      toast.error('Failed to register device', { description: err.reason || 'Transaction failed' });
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [contract, signer, fetchData]);
+      const encodedName = safeEncodeBytes32('Device name', name);
+      const encodedType = safeEncodeBytes32('Device type', deviceType);
+      if (!encodedName || !encodedType) return false;
+
+      try {
+        setIsLoading(true);
+        const tx = await contract.registerDevice(deviceAddress, encodedName, encodedType, permission);
+        toast.info('Transaction submitted', { description: 'Waiting for confirmation...' });
+        await tx.wait();
+        toast.success('Device registered successfully');
+        await fetchData();
+        return true;
+      } catch (error: unknown) {
+        console.error('Error registering device:', error);
+        const err = error as { reason?: string };
+        toast.error('Failed to register device', { description: err.reason || 'Transaction failed' });
+        return false;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [contract, signer, fetchData]
+  );
 
   // Register a node
-  const registerNode = useCallback(async (
-    nodeAddress: string,
-    name: string,
-    isValidator: boolean
-  ) => {
-    if (!contract || !signer) {
-      toast.error('Wallet not connected');
-      return false;
-    }
+  const registerNode = useCallback(
+    async (nodeAddress: string, name: string, isValidator: boolean) => {
+      if (!contract || !signer) {
+        toast.error('Wallet not connected');
+        return false;
+      }
 
-    try {
-      setIsLoading(true);
-      const tx = await contract.registerNode(nodeAddress, name, isValidator);
-      toast.info('Transaction submitted', { description: 'Waiting for confirmation...' });
-      await tx.wait();
-      toast.success('Node registered successfully');
-      await fetchData();
-      return true;
-    } catch (error: unknown) {
-      console.error('Error registering node:', error);
-      const err = error as { reason?: string };
-      toast.error('Failed to register node', { description: err.reason || 'Transaction failed' });
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [contract, signer, fetchData]);
+      const encodedName = safeEncodeBytes32('Node name', name);
+      if (!encodedName) return false;
+
+      try {
+        setIsLoading(true);
+        const tx = await contract.registerNode(nodeAddress, encodedName, isValidator);
+        toast.info('Transaction submitted', { description: 'Waiting for confirmation...' });
+        await tx.wait();
+        toast.success('Node registered successfully');
+        await fetchData();
+        return true;
+      } catch (error: unknown) {
+        console.error('Error registering node:', error);
+        const err = error as { reason?: string };
+        toast.error('Failed to register node', { description: err.reason || 'Transaction failed' });
+        return false;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [contract, signer, fetchData]
+  );
 
   // Record IoT data
-  const recordData = useCallback(async (
-    deviceName: string,
-    dataType: string,
-    value: number
-  ) => {
-    if (!contract || !signer) {
-      toast.error('Wallet not connected');
-      return false;
-    }
+  const recordData = useCallback(
+    async (deviceName: string, dataType: string, value: number) => {
+      if (!contract || !signer) {
+        toast.error('Wallet not connected');
+        return false;
+      }
 
-    try {
-      setIsLoading(true);
-      const signature = keccak256(toUtf8Bytes(`${deviceName}${dataType}${value}${Date.now()}`));
-      const tx = await contract.recordData(deviceName, dataType, value, signature);
-      toast.info('Transaction submitted', { description: 'Waiting for confirmation...' });
-      await tx.wait();
-      toast.success('Data recorded on blockchain');
-      await fetchData();
-      return true;
-    } catch (error: unknown) {
-      console.error('Error recording data:', error);
-      const err = error as { reason?: string };
-      toast.error('Failed to record data', { description: err.reason || 'Transaction failed' });
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [contract, signer, fetchData]);
+      const encodedDeviceName = safeEncodeBytes32('Device name', deviceName);
+      const encodedDataType = safeEncodeBytes32('Data type', dataType);
+      if (!encodedDeviceName || !encodedDataType) return false;
+
+      try {
+        setIsLoading(true);
+        const signature = keccak256(toUtf8Bytes(`${deviceName}${dataType}${value}${Date.now()}`));
+        const tx = await contract.recordData(encodedDeviceName, encodedDataType, value, signature);
+        toast.info('Transaction submitted', { description: 'Waiting for confirmation...' });
+        await tx.wait();
+        toast.success('Data recorded on blockchain');
+        await fetchData();
+        return true;
+      } catch (error: unknown) {
+        console.error('Error recording data:', error);
+        const err = error as { reason?: string };
+        toast.error('Failed to record data', { description: err.reason || 'Transaction failed' });
+        return false;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [contract, signer, fetchData]
+  );
 
   // Generate blocks from transactions (for visualization)
   const blocks: Block[] = transactions.reduce<Block[]>((acc, tx, index) => {
@@ -243,9 +283,10 @@ export function useBlockchain() {
         index: blockIndex + 1,
         timestamp: tx.timestamp,
         hash: keccak256(toUtf8Bytes(`block-${blockIndex}-${tx.timestamp.getTime()}`)),
-        previousHash: blockIndex > 0 
-          ? keccak256(toUtf8Bytes(`block-${blockIndex - 1}`))
-          : '0x0000000000000000000000000000000000000000000000000000000000000000',
+        previousHash:
+          blockIndex > 0
+            ? keccak256(toUtf8Bytes(`block-${blockIndex - 1}`))
+            : '0x0000000000000000000000000000000000000000000000000000000000000000',
         data: [],
         nonce: Math.floor(Math.random() * 100000),
         validator: nodes[0]?.id || 'unknown',
