@@ -17,7 +17,7 @@ export const SEPOLIA_NETWORK = {
 // ============================================
 // DEPLOY THE CONTRACT AND PASTE ADDRESS HERE
 // ============================================
-export const CONTRACT_ADDRESS = 'YOUR_CONTRACT_ADDRESS_HERE';
+export const CONTRACT_ADDRESS = '0x3558b70ef0ea39716b7639D78722940c5dF401CB';
 
 // Contract ABI - matches IoTBlockchain.sol
 export const CONTRACT_ABI = [

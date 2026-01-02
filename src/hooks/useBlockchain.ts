@@ -83,7 +83,7 @@ export function useBlockchain() {
       return;
     }
 
-    if (CONTRACT_ADDRESS === 'YOUR_CONTRACT_ADDRESS_HERE') {
+    if (!CONTRACT_ADDRESS || CONTRACT_ADDRESS.length < 42) {
       setIsContractDeployed(false);
       return;
     }
