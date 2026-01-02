@@ -79,23 +79,52 @@ export function useBlockchain() {
 
   // Initialize contract
   useEffect(() => {
-    if (!provider || !isCorrectNetwork) {
-      setContract(null);
-      setIsContractDeployed(false);
-      setHasFetched(false);
-      setContractError(false);
-      return;
-    }
+    let cancelled = false;
 
-    if (!CONTRACT_ADDRESS || CONTRACT_ADDRESS.length < 42) {
-      setIsContractDeployed(false);
-      return;
-    }
+    const init = async () => {
+      if (!provider || !isCorrectNetwork) {
+        setContract(null);
+        setIsContractDeployed(false);
+        setHasFetched(false);
+        setContractError(false);
+        return;
+      }
 
-    const contractInstance = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer || provider);
-    setContract(contractInstance);
-    setIsContractDeployed(true);
-    setContractError(false);
+      if (!CONTRACT_ADDRESS || CONTRACT_ADDRESS.length < 42) {
+        setIsContractDeployed(false);
+        return;
+      }
+
+      try {
+        const code = await provider.getCode(CONTRACT_ADDRESS);
+        if (cancelled) return;
+
+        if (!code || code === '0x') {
+          setContract(null);
+          setIsContractDeployed(false);
+          setHasFetched(false);
+          setContractError(false);
+          return;
+        }
+
+        const contractInstance = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer || provider);
+        setContract(contractInstance);
+        setIsContractDeployed(true);
+        setContractError(false);
+      } catch (e) {
+        console.error('Error initializing contract:', e);
+        setContract(null);
+        setIsContractDeployed(false);
+        setHasFetched(false);
+        setContractError(true);
+      }
+    };
+
+    init();
+
+    return () => {
+      cancelled = true;
+    };
   }, [provider, signer, isCorrectNetwork]);
 
   // Fetch all data
@@ -174,9 +203,13 @@ export function useBlockchain() {
       setHasFetched(true);
     } catch (error) {
       console.error('Error fetching blockchain data:', error);
+      setContract(null);
+      setIsContractDeployed(false);
+      setHasFetched(false);
       setContractError(true);
-      toast.error('Contract mismatch', { 
-        description: 'The deployed contract does not match the expected ABI. Please redeploy the correct contract.' 
+      toast.error('Contract not compatible', {
+        description:
+          'The contract at this address does not match the expected ABI. Redeploy contracts/IoTBlockchain.sol and update the address.',
       });
     } finally {
       setIsLoading(false);
