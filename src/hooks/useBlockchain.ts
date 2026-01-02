@@ -74,12 +74,16 @@ export function useBlockchain() {
   const [transactions, setTransactions] = useState<IoTTransaction[]>([]);
   const [stats, setStats] = useState<BlockchainStats | null>(null);
   const [isContractDeployed, setIsContractDeployed] = useState(false);
+  const [hasFetched, setHasFetched] = useState(false);
+  const [contractError, setContractError] = useState(false);
 
   // Initialize contract
   useEffect(() => {
     if (!provider || !isCorrectNetwork) {
       setContract(null);
       setIsContractDeployed(false);
+      setHasFetched(false);
+      setContractError(false);
       return;
     }
 
@@ -91,11 +95,13 @@ export function useBlockchain() {
     const contractInstance = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer || provider);
     setContract(contractInstance);
     setIsContractDeployed(true);
+    setContractError(false);
   }, [provider, signer, isCorrectNetwork]);
 
   // Fetch all data
   const fetchData = useCallback(async () => {
-    if (!contract || !isContractDeployed) return;
+    if (!contract || !isContractDeployed || contractError) return;
+    if (isLoading) return; // Prevent concurrent fetches
 
     setIsLoading(true);
     try {
@@ -164,19 +170,25 @@ export function useBlockchain() {
         });
         setTransactions(mappedTransactions);
       }
+      
+      setHasFetched(true);
     } catch (error) {
       console.error('Error fetching blockchain data:', error);
+      setContractError(true);
+      toast.error('Contract mismatch', { 
+        description: 'The deployed contract does not match the expected ABI. Please redeploy the correct contract.' 
+      });
     } finally {
       setIsLoading(false);
     }
-  }, [contract, isContractDeployed]);
+  }, [contract, isContractDeployed, contractError, isLoading]);
 
-  // Auto-fetch on mount and contract change
+  // Auto-fetch on mount - only once
   useEffect(() => {
-    if (isContractDeployed) {
+    if (isContractDeployed && !hasFetched && !contractError) {
       fetchData();
     }
-  }, [isContractDeployed, fetchData]);
+  }, [isContractDeployed, hasFetched, contractError, fetchData]);
 
   // Register a device
   const registerDevice = useCallback(
