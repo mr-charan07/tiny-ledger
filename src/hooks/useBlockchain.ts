@@ -11,35 +11,6 @@ import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/config/blockchain';
 import { toast } from 'sonner';
 import type { Block, IoTDevice, Node, IoTTransaction, BlockchainStats } from '@/types/blockchain';
 
-interface ContractDevice {
-  deviceAddress: string;
-  name: string; // bytes32
-  deviceType: string; // bytes32
-  isActive: boolean;
-  registeredAt: bigint;
-  transactionCount: bigint;
-  permission: number;
-}
-
-interface ContractNode {
-  nodeAddress: string;
-  name: string; // bytes32
-  isValidator: boolean;
-  isActive: boolean;
-  blocksValidated: bigint;
-  lastSeen: bigint;
-}
-
-interface ContractDataRecord {
-  id: bigint;
-  deviceAddress: string;
-  deviceName: string; // bytes32
-  dataType: string; // bytes32
-  value: bigint;
-  timestamp: bigint;
-  signature: string;
-}
-
 const permissionMap: Record<number, 'read' | 'write' | 'admin'> = {
   0: 'read',
   1: 'write',
@@ -90,7 +61,7 @@ export function useBlockchain() {
         return;
       }
 
-      if (!CONTRACT_ADDRESS || CONTRACT_ADDRESS.length < 42) {
+      if (!CONTRACT_ADDRESS || (CONTRACT_ADDRESS as string).length < 42) {
         setIsContractDeployed(false);
         return;
       }
@@ -127,79 +98,107 @@ export function useBlockchain() {
     };
   }, [provider, signer, isCorrectNetwork]);
 
-  // Fetch all data
+  // Fetch all data using individual getters
   const fetchData = useCallback(async () => {
     if (!contract || !isContractDeployed || contractError) return;
-    if (isLoading) return; // Prevent concurrent fetches
+    if (isLoading) return;
 
     setIsLoading(true);
     try {
-      // Fetch stats
-      const [totalData, totalDevices, totalNodes, activeDevices, activeNodes] = await contract.getStats();
+      // Fetch counts
+      const [dataCountBN, deviceCountBN, nodeCountBN] = await Promise.all([
+        contract.dataCount(),
+        contract.deviceCount(),
+        contract.nodeCount(),
+      ]);
 
-      setStats({
-        totalBlocks: Number(totalData),
-        totalTransactions: Number(totalData),
-        activeNodes: Number(activeNodes),
-        activeDevices: Number(activeDevices),
-        avgBlockTime: 12,
-        storageUsed: Number(totalData) * 0.001,
-      });
+      const totalData = Number(dataCountBN);
+      const totalDevices = Number(deviceCountBN);
+      const totalNodes = Number(nodeCountBN);
 
-      // Fetch devices
-      const contractDevices: ContractDevice[] = await contract.getAllDevices();
-      const mappedDevices: IoTDevice[] = contractDevices.map((d) => {
-        const decodedName = safeDecodeBytes32(d.name);
-        const decodedType = safeDecodeBytes32(d.deviceType);
-        const normalizedType = (['sensor', 'actuator', 'gateway'] as const).includes(decodedType as any)
-          ? (decodedType as 'sensor' | 'actuator' | 'gateway')
-          : 'sensor';
+      // Fetch devices by iterating
+      const devicePromises: Promise<{ addr: string; name: string; active: boolean; perm: number }>[] = [];
+      for (let i = 0; i < totalDevices; i++) {
+        devicePromises.push(
+          (async () => {
+            const addr = await contract.getDeviceAt(i);
+            const [name, active, perm] = await contract.getDevice(addr);
+            return { addr, name, active, perm };
+          })()
+        );
+      }
+      const deviceResults = await Promise.all(devicePromises);
 
-        return {
-          id: d.deviceAddress,
-          name: decodedName,
-          type: normalizedType,
-          status: d.isActive ? 'online' : 'offline',
-          lastReading: new Date(Number(d.registeredAt) * 1000),
-          transactionCount: Number(d.transactionCount),
-          permission: permissionMap[d.permission] || 'read',
-        };
-      });
+      const mappedDevices: IoTDevice[] = deviceResults.map((d) => ({
+        id: d.addr,
+        name: safeDecodeBytes32(d.name),
+        type: 'sensor' as const,
+        status: d.active ? 'online' : 'offline',
+        lastReading: new Date(),
+        transactionCount: 0,
+        permission: permissionMap[d.perm] || 'read',
+      }));
       setDevices(mappedDevices);
 
-      // Fetch nodes
-      const contractNodes: ContractNode[] = await contract.getAllNodes();
-      const mappedNodes: Node[] = contractNodes.map((n) => ({
-        id: n.nodeAddress,
+      // Fetch nodes by iterating
+      const nodePromises: Promise<{ addr: string; name: string; active: boolean; validator: boolean }>[] = [];
+      for (let i = 0; i < totalNodes; i++) {
+        nodePromises.push(
+          (async () => {
+            const addr = await contract.getNodeAt(i);
+            const [name, active, validator] = await contract.getNode(addr);
+            return { addr, name, active, validator };
+          })()
+        );
+      }
+      const nodeResults = await Promise.all(nodePromises);
+
+      const mappedNodes: Node[] = nodeResults.map((n) => ({
+        id: n.addr,
         name: safeDecodeBytes32(n.name),
-        address: n.nodeAddress,
-        status: n.isActive ? 'active' : 'inactive',
-        role: n.isValidator ? 'validator' : 'observer',
-        lastSeen: new Date(Number(n.lastSeen) * 1000),
-        blocksValidated: Number(n.blocksValidated),
+        address: n.addr,
+        status: n.active ? 'active' : 'inactive',
+        role: n.validator ? 'validator' : 'observer',
+        lastSeen: new Date(),
+        blocksValidated: 0,
       }));
       setNodes(mappedNodes);
 
-      // Fetch recent data/transactions
-      const dataCount = Number(totalData);
-      if (dataCount > 0) {
-        const recentData: ContractDataRecord[] = await contract.getRecentData(Math.min(dataCount, 10));
-        const mappedTransactions: IoTTransaction[] = recentData.map((d) => {
-          const deviceName = safeDecodeBytes32(d.deviceName);
-          const dataType = safeDecodeBytes32(d.dataType);
-
-          return {
-            id: `tx-${d.id.toString()}`,
-            deviceId: d.deviceAddress,
-            deviceName,
-            data: { [dataType]: Number(d.value) },
-            timestamp: new Date(Number(d.timestamp) * 1000),
-            signature: d.signature.slice(0, 18),
-          };
-        });
-        setTransactions(mappedTransactions);
+      // Fetch recent records (last 10)
+      const recordCount = Math.min(totalData, 10);
+      const recordPromises: Promise<IoTTransaction>[] = [];
+      for (let i = totalData; i > totalData - recordCount && i > 0; i--) {
+        const id = i;
+        recordPromises.push(
+          (async () => {
+            const [device, dataHash, timestamp] = await contract.getRecord(id);
+            return {
+              id: `tx-${id}`,
+              deviceId: device,
+              deviceName: device.slice(0, 10),
+              data: { hash: dataHash },
+              timestamp: new Date(Number(timestamp) * 1000),
+              signature: dataHash.slice(0, 18),
+            };
+          })()
+        );
       }
-      
+      const recordResults = await Promise.all(recordPromises);
+      setTransactions(recordResults);
+
+      // Calculate active counts
+      const activeDevices = mappedDevices.filter((d) => d.status === 'online').length;
+      const activeNodes = mappedNodes.filter((n) => n.status === 'active').length;
+
+      setStats({
+        totalBlocks: totalData,
+        totalTransactions: totalData,
+        activeNodes,
+        activeDevices,
+        avgBlockTime: 12,
+        storageUsed: totalData * 0.001,
+      });
+
       setHasFetched(true);
     } catch (error) {
       console.error('Error fetching blockchain data:', error);
@@ -216,7 +215,7 @@ export function useBlockchain() {
     }
   }, [contract, isContractDeployed, contractError, isLoading]);
 
-  // Auto-fetch on mount - only once
+  // Auto-fetch on mount
   useEffect(() => {
     if (isContractDeployed && !hasFetched && !contractError) {
       fetchData();
@@ -225,19 +224,18 @@ export function useBlockchain() {
 
   // Register a device
   const registerDevice = useCallback(
-    async (deviceAddress: string, name: string, deviceType: string, permission: number) => {
+    async (deviceAddress: string, name: string, _deviceType: string, permission: number) => {
       if (!contract || !signer) {
         toast.error('Wallet not connected');
         return false;
       }
 
       const encodedName = safeEncodeBytes32('Device name', name);
-      const encodedType = safeEncodeBytes32('Device type', deviceType);
-      if (!encodedName || !encodedType) return false;
+      if (!encodedName) return false;
 
       try {
         setIsLoading(true);
-        const tx = await contract.registerDevice(deviceAddress, encodedName, encodedType, permission);
+        const tx = await contract.addDevice(deviceAddress, encodedName, permission);
         toast.info('Transaction submitted', { description: 'Waiting for confirmation...' });
         await tx.wait();
         toast.success('Device registered successfully');
@@ -268,7 +266,7 @@ export function useBlockchain() {
 
       try {
         setIsLoading(true);
-        const tx = await contract.registerNode(nodeAddress, encodedName, isValidator);
+        const tx = await contract.addNode(nodeAddress, encodedName, isValidator);
         toast.info('Transaction submitted', { description: 'Waiting for confirmation...' });
         await tx.wait();
         toast.success('Node registered successfully');
@@ -286,7 +284,7 @@ export function useBlockchain() {
     [contract, signer, fetchData]
   );
 
-  // Record IoT data
+  // Record IoT data (now just a hash)
   const recordData = useCallback(
     async (deviceName: string, dataType: string, value: number) => {
       if (!contract || !signer) {
@@ -294,14 +292,11 @@ export function useBlockchain() {
         return false;
       }
 
-      const encodedDeviceName = safeEncodeBytes32('Device name', deviceName);
-      const encodedDataType = safeEncodeBytes32('Data type', dataType);
-      if (!encodedDeviceName || !encodedDataType) return false;
-
       try {
         setIsLoading(true);
-        const signature = keccak256(toUtf8Bytes(`${deviceName}${dataType}${value}${Date.now()}`));
-        const tx = await contract.recordData(encodedDeviceName, encodedDataType, value, signature);
+        // Create a hash from the data
+        const dataHash = keccak256(toUtf8Bytes(`${deviceName}|${dataType}|${value}|${Date.now()}`));
+        const tx = await contract.record(dataHash);
         toast.info('Transaction submitted', { description: 'Waiting for confirmation...' });
         await tx.wait();
         toast.success('Data recorded on blockchain');

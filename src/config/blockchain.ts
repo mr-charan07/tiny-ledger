@@ -17,42 +17,35 @@ export const SEPOLIA_NETWORK = {
 // ============================================
 // DEPLOY THE CONTRACT AND PASTE ADDRESS HERE
 // ============================================
-export const CONTRACT_ADDRESS = '0x3558b70ef0ea39716b7639D78722940c5dF401CB';
+export const CONTRACT_ADDRESS = '';
 
-// Contract ABI - matches IoTBlockchain.sol
+// Contract ABI - matches minimal IoTBlockchain.sol
 export const CONTRACT_ABI = [
   // Events
-  "event DataRecorded(uint256 indexed id, address indexed device, bytes32 deviceName, bytes32 dataType, int256 value, uint256 timestamp)",
-  "event DeviceRegistered(address indexed deviceAddress, bytes32 name, bytes32 deviceType, uint8 permission)",
-  "event DeviceStatusChanged(address indexed deviceAddress, bool isActive)",
-  "event NodeRegistered(address indexed nodeAddress, bytes32 name, bool isValidator)",
-  "event NodeStatusChanged(address indexed nodeAddress, bool isActive)",
-  "event PermissionChanged(address indexed deviceAddress, uint8 newPermission)",
+  "event DataRecorded(uint256 indexed id, address indexed device, bytes32 dataHash)",
+  "event DeviceAdded(address indexed device, bytes32 name)",
+  "event NodeAdded(address indexed node, bytes32 name)",
 
   // View functions
   "function owner() view returns (address)",
   "function dataCount() view returns (uint256)",
   "function deviceCount() view returns (uint256)",
   "function nodeCount() view returns (uint256)",
-  "function getDataRecord(uint256 _id) view returns (tuple(uint256 id, address deviceAddress, bytes32 deviceName, bytes32 dataType, int256 value, uint256 timestamp, bytes32 signature))",
-  "function getRecentData(uint256 _count) view returns (tuple(uint256 id, address deviceAddress, bytes32 deviceName, bytes32 dataType, int256 value, uint256 timestamp, bytes32 signature)[])",
-  "function getAllDevices() view returns (tuple(address deviceAddress, bytes32 name, bytes32 deviceType, bool isActive, uint256 registeredAt, uint256 transactionCount, uint8 permission)[])",
-  "function getAllNodes() view returns (tuple(address nodeAddress, bytes32 name, bool isValidator, bool isActive, uint256 blocksValidated, uint256 lastSeen)[])",
-  "function getDevice(address _deviceAddress) view returns (tuple(address deviceAddress, bytes32 name, bytes32 deviceType, bool isActive, uint256 registeredAt, uint256 transactionCount, uint8 permission))",
-  "function getNode(address _nodeAddress) view returns (tuple(address nodeAddress, bytes32 name, bool isValidator, bool isActive, uint256 blocksValidated, uint256 lastSeen))",
-  "function getStats() view returns (uint256 totalData, uint256 totalDevices, uint256 totalNodes, uint256 activeDevices, uint256 activeNodes)",
-  "function authorizedDevices(address) view returns (bool)",
-  "function authorizedNodes(address) view returns (bool)",
+  "function records(uint256) view returns (address device, bytes32 dataHash, uint256 timestamp)",
+  "function devices(address) view returns (bytes32 name, bool active, uint8 perm)",
+  "function nodes(address) view returns (bytes32 name, bool active, bool validator)",
+  "function getRecord(uint256 _id) view returns (address, bytes32, uint256)",
+  "function getDevice(address _addr) view returns (bytes32, bool, uint8)",
+  "function getNode(address _addr) view returns (bytes32, bool, bool)",
+  "function getDeviceAt(uint256 _index) view returns (address)",
+  "function getNodeAt(uint256 _index) view returns (address)",
 
   // Write functions
-  "function registerDevice(address _deviceAddress, bytes32 _name, bytes32 _deviceType, uint8 _permission)",
-  "function setDeviceStatus(address _deviceAddress, bool _isActive)",
-  "function setDevicePermission(address _deviceAddress, uint8 _permission)",
-  "function registerNode(address _nodeAddress, bytes32 _name, bool _isValidator)",
-  "function setNodeStatus(address _nodeAddress, bool _isActive)",
-  "function updateNodeLastSeen(address _nodeAddress)",
-  "function recordData(bytes32 _deviceName, bytes32 _dataType, int256 _value, bytes32 _signature) returns (uint256)",
-  "function transferOwnership(address _newOwner)",
+  "function addDevice(address _addr, bytes32 _name, uint8 _perm)",
+  "function addNode(address _addr, bytes32 _name, bool _validator)",
+  "function record(bytes32 _hash)",
+  "function setDeviceActive(address _addr, bool _active)",
+  "function setNodeActive(address _addr, bool _active)",
 ] as const;
 
 export const ETHERSCAN_URL = 'https://sepolia.etherscan.io';
