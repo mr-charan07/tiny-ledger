@@ -1,237 +1,104 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
-/**
- * @title IoTBlockchain
- * @dev Compact, permissioned IoT data registry designed to stay under the EIP-3860 initcode limit.
- * @notice Deploy with optimizer enabled (Remix: Solidity Compiler -> Advanced -> Enable Optimization).
- */
 contract IoTBlockchain {
-    // ---- Custom errors (smaller than revert strings) ----
-    error NotOwner();
-    error AlreadyRegistered();
-    error NotRegistered();
-    error NotAuthorized();
-    error Inactive();
-    error NoWritePermission();
-    error InvalidId();
-    error InvalidAddress();
-
-    // ---- Data structures ----
-    struct IoTData {
-        uint256 id;
-        address deviceAddress;
-        bytes32 deviceName;
-        bytes32 dataType;
-        int256 value;
-        uint256 timestamp;
-        bytes32 signature;
-    }
-
-    struct Device {
-        address deviceAddress;
-        bytes32 name;
-        bytes32 deviceType; // e.g. "sensor", "actuator", "gateway"
-        bool isActive;
-        uint256 registeredAt;
-        uint256 transactionCount;
-        uint8 permission; // 0=READ, 1=WRITE, 2=ADMIN
-    }
-
-    struct Node {
-        address nodeAddress;
-        bytes32 name;
-        bool isValidator;
-        bool isActive;
-        uint256 blocksValidated;
-        uint256 lastSeen;
-    }
-
-    // ---- State ----
     address public owner;
     uint256 public dataCount;
     uint256 public deviceCount;
     uint256 public nodeCount;
 
-    mapping(uint256 => IoTData) private dataRecords;
-    mapping(address => Device) private deviceByAddress;
-    mapping(address => Node) private nodeByAddress;
+    struct IoTData {
+        uint256 id;
+        address device;
+        bytes32 dataHash;
+        uint256 timestamp;
+    }
 
-    mapping(address => bool) public authorizedDevices;
-    mapping(address => bool) public authorizedNodes;
+    struct Device {
+        address addr;
+        bytes32 name;
+        bool active;
+        uint8 permission;
+    }
 
-    address[] private deviceAddresses;
-    address[] private nodeAddresses;
+    struct Node {
+        address addr;
+        bytes32 name;
+        bool active;
+        bool isValidator;
+    }
 
-    // ---- Events ----
-    event DataRecorded(
-        uint256 indexed id,
-        address indexed device,
-        bytes32 deviceName,
-        bytes32 dataType,
-        int256 value,
-        uint256 timestamp
-    );
+    mapping(uint256 => IoTData) public dataRecords;
+    mapping(address => Device) public devices;
+    mapping(address => Node) public nodes;
+    address[] public deviceList;
+    address[] public nodeList;
 
-    event DeviceRegistered(address indexed deviceAddress, bytes32 name, bytes32 deviceType, uint8 permission);
-    event DeviceStatusChanged(address indexed deviceAddress, bool isActive);
-    event NodeRegistered(address indexed nodeAddress, bytes32 name, bool isValidator);
-    event NodeStatusChanged(address indexed nodeAddress, bool isActive);
-    event PermissionChanged(address indexed deviceAddress, uint8 newPermission);
+    event DataRecorded(uint256 indexed id, address indexed device, bytes32 dataHash);
+    event DeviceRegistered(address indexed device, bytes32 name);
+    event NodeRegistered(address indexed node, bytes32 name);
 
-    // ---- Modifiers ----
     modifier onlyOwner() {
-        if (msg.sender != owner) revert NotOwner();
+        require(msg.sender == owner, "Not owner");
         _;
     }
 
-    // ---- Constructor ----
     constructor() {
         owner = msg.sender;
-
-        // register deployer as initial validator node
-        nodeByAddress[msg.sender] = Node({
-            nodeAddress: msg.sender,
-            name: bytes32("PRIMARY_VALIDATOR"),
-            isValidator: true,
-            isActive: true,
-            blocksValidated: 0,
-            lastSeen: block.timestamp
-        });
-
-        authorizedNodes[msg.sender] = true;
-        nodeAddresses.push(msg.sender);
+        nodes[msg.sender] = Node(msg.sender, "Primary", true, true);
+        nodeList.push(msg.sender);
         nodeCount = 1;
     }
 
-    // ==================== DEVICE MANAGEMENT ====================
-
-    function registerDevice(address _deviceAddress, bytes32 _name, bytes32 _deviceType, uint8 _permission) external onlyOwner {
-        if (authorizedDevices[_deviceAddress]) revert AlreadyRegistered();
-
-        deviceByAddress[_deviceAddress] = Device({
-            deviceAddress: _deviceAddress,
-            name: _name,
-            deviceType: _deviceType,
-            isActive: true,
-            registeredAt: block.timestamp,
-            transactionCount: 0,
-            permission: _permission
-        });
-
-        authorizedDevices[_deviceAddress] = true;
-        deviceAddresses.push(_deviceAddress);
-        unchecked {
-            deviceCount++;
-        }
-
-        emit DeviceRegistered(_deviceAddress, _name, _deviceType, _permission);
+    function registerDevice(address _addr, bytes32 _name, uint8 _perm) external onlyOwner {
+        require(devices[_addr].addr == address(0), "Exists");
+        devices[_addr] = Device(_addr, _name, true, _perm);
+        deviceList.push(_addr);
+        deviceCount++;
+        emit DeviceRegistered(_addr, _name);
     }
 
-    function setDeviceStatus(address _deviceAddress, bool _isActive) external onlyOwner {
-        if (!authorizedDevices[_deviceAddress]) revert NotRegistered();
-        deviceByAddress[_deviceAddress].isActive = _isActive;
-        emit DeviceStatusChanged(_deviceAddress, _isActive);
+    function registerNode(address _addr, bytes32 _name, bool _validator) external onlyOwner {
+        require(nodes[_addr].addr == address(0), "Exists");
+        nodes[_addr] = Node(_addr, _name, true, _validator);
+        nodeList.push(_addr);
+        nodeCount++;
+        emit NodeRegistered(_addr, _name);
     }
 
-    function setDevicePermission(address _deviceAddress, uint8 _permission) external onlyOwner {
-        if (!authorizedDevices[_deviceAddress]) revert NotRegistered();
-        deviceByAddress[_deviceAddress].permission = _permission;
-        emit PermissionChanged(_deviceAddress, _permission);
+    function recordData(bytes32 _hash) external {
+        Device storage d = devices[msg.sender];
+        require(d.active && d.permission >= 2 || msg.sender == owner, "No access");
+        dataCount++;
+        dataRecords[dataCount] = IoTData(dataCount, msg.sender, _hash, block.timestamp);
+        emit DataRecorded(dataCount, msg.sender, _hash);
     }
 
-    // ==================== NODE MANAGEMENT ====================
-
-    function registerNode(address _nodeAddress, bytes32 _name, bool _isValidator) external onlyOwner {
-        if (authorizedNodes[_nodeAddress]) revert AlreadyRegistered();
-
-        nodeByAddress[_nodeAddress] = Node({
-            nodeAddress: _nodeAddress,
-            name: _name,
-            isValidator: _isValidator,
-            isActive: true,
-            blocksValidated: 0,
-            lastSeen: block.timestamp
-        });
-
-        authorizedNodes[_nodeAddress] = true;
-        nodeAddresses.push(_nodeAddress);
-        unchecked {
-            nodeCount++;
-        }
-
-        emit NodeRegistered(_nodeAddress, _name, _isValidator);
+    function setDeviceStatus(address _addr, bool _active) external onlyOwner {
+        devices[_addr].active = _active;
     }
 
-    function setNodeStatus(address _nodeAddress, bool _isActive) external onlyOwner {
-        if (!authorizedNodes[_nodeAddress]) revert NotRegistered();
-        nodeByAddress[_nodeAddress].isActive = _isActive;
-        emit NodeStatusChanged(_nodeAddress, _isActive);
+    function setNodeStatus(address _addr, bool _active) external onlyOwner {
+        nodes[_addr].active = _active;
     }
 
-    function updateNodeLastSeen(address _nodeAddress) external {
-        if (!authorizedNodes[_nodeAddress]) revert NotRegistered();
-        if (msg.sender != _nodeAddress && msg.sender != owner) revert NotAuthorized();
-        nodeByAddress[_nodeAddress].lastSeen = block.timestamp;
-    }
-
-    // ==================== DATA RECORDING ====================
-
-    function recordData(bytes32 _deviceName, bytes32 _dataType, int256 _value, bytes32 _signature)
-        external
-        returns (uint256)
-    {
-        if (!authorizedDevices[msg.sender] && msg.sender != owner) revert NotAuthorized();
-
-        if (msg.sender != owner) {
-            Device storage d = deviceByAddress[msg.sender];
-            if (!d.isActive) revert Inactive();
-            if (d.permission < 1) revert NoWritePermission();
-            unchecked {
-                d.transactionCount++;
-            }
-        }
-
-        unchecked {
-            dataCount++;
-        }
-
-        dataRecords[dataCount] = IoTData({
-            id: dataCount,
-            deviceAddress: msg.sender,
-            deviceName: _deviceName,
-            dataType: _dataType,
-            value: _value,
-            timestamp: block.timestamp,
-            signature: _signature
-        });
-
-        emit DataRecorded(dataCount, msg.sender, _deviceName, _dataType, _value, block.timestamp);
-        return dataCount;
-    }
-
-    // ==================== VIEW FUNCTIONS ====================
-
-    function getDataRecord(uint256 _id) external view returns (IoTData memory) {
-        if (_id == 0 || _id > dataCount) revert InvalidId();
+    function getData(uint256 _id) external view returns (IoTData memory) {
         return dataRecords[_id];
     }
 
     function getRecentData(uint256 _count) external view returns (IoTData[] memory) {
-        uint256 count = _count > dataCount ? dataCount : _count;
-        IoTData[] memory recent = new IoTData[](count);
-
-        for (uint256 i = 0; i < count; i++) {
-            recent[i] = dataRecords[dataCount - i];
+        uint256 len = _count > dataCount ? dataCount : _count;
+        IoTData[] memory result = new IoTData[](len);
+        for (uint256 i = 0; i < len; i++) {
+            result[i] = dataRecords[dataCount - i];
         }
-
-        return recent;
+        return result;
     }
 
     function getAllDevices() external view returns (Device[] memory) {
         Device[] memory result = new Device[](deviceCount);
         for (uint256 i = 0; i < deviceCount; i++) {
-            result[i] = deviceByAddress[deviceAddresses[i]];
+            result[i] = devices[deviceList[i]];
         }
         return result;
     }
@@ -239,40 +106,20 @@ contract IoTBlockchain {
     function getAllNodes() external view returns (Node[] memory) {
         Node[] memory result = new Node[](nodeCount);
         for (uint256 i = 0; i < nodeCount; i++) {
-            result[i] = nodeByAddress[nodeAddresses[i]];
+            result[i] = nodes[nodeList[i]];
         }
         return result;
     }
 
-    function getDevice(address _deviceAddress) external view returns (Device memory) {
-        if (!authorizedDevices[_deviceAddress]) revert NotRegistered();
-        return deviceByAddress[_deviceAddress];
-    }
-
-    function getNode(address _nodeAddress) external view returns (Node memory) {
-        if (!authorizedNodes[_nodeAddress]) revert NotRegistered();
-        return nodeByAddress[_nodeAddress];
-    }
-
-    function getStats() external view returns (uint256 totalData, uint256 totalDevices, uint256 totalNodes, uint256 activeDevices, uint256 activeNodes) {
-        uint256 aD = 0;
-        uint256 aN = 0;
-
+    function getStats() external view returns (uint256, uint256, uint256, uint256, uint256) {
+        uint256 activeDevices;
+        uint256 activeNodes;
         for (uint256 i = 0; i < deviceCount; i++) {
-            if (deviceByAddress[deviceAddresses[i]].isActive) aD++;
+            if (devices[deviceList[i]].active) activeDevices++;
         }
-
         for (uint256 i = 0; i < nodeCount; i++) {
-            if (nodeByAddress[nodeAddresses[i]].isActive) aN++;
+            if (nodes[nodeList[i]].active) activeNodes++;
         }
-
-        return (dataCount, deviceCount, nodeCount, aD, aN);
-    }
-
-    // ==================== OWNER FUNCTIONS ====================
-
-    function transferOwnership(address _newOwner) external onlyOwner {
-        if (_newOwner == address(0)) revert InvalidAddress();
-        owner = _newOwner;
+        return (dataCount, deviceCount, nodeCount, activeDevices, activeNodes);
     }
 }
