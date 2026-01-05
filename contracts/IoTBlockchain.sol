@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.19;
 
 contract IoTBlockchain {
     address public owner;
@@ -7,119 +7,98 @@ contract IoTBlockchain {
     uint256 public deviceCount;
     uint256 public nodeCount;
 
-    struct IoTData {
-        uint256 id;
+    struct Device {
+        bytes32 name;
+        bool active;
+        uint8 perm;
+    }
+
+    struct Node {
+        bytes32 name;
+        bool active;
+        bool validator;
+    }
+
+    struct DataRecord {
         address device;
         bytes32 dataHash;
         uint256 timestamp;
     }
 
-    struct Device {
-        address addr;
-        bytes32 name;
-        bool active;
-        uint8 permission;
-    }
-
-    struct Node {
-        address addr;
-        bytes32 name;
-        bool active;
-        bool isValidator;
-    }
-
-    mapping(uint256 => IoTData) public dataRecords;
+    mapping(uint256 => DataRecord) public records;
     mapping(address => Device) public devices;
     mapping(address => Node) public nodes;
     address[] public deviceList;
     address[] public nodeList;
 
     event DataRecorded(uint256 indexed id, address indexed device, bytes32 dataHash);
-    event DeviceRegistered(address indexed device, bytes32 name);
-    event NodeRegistered(address indexed node, bytes32 name);
+    event DeviceAdded(address indexed device, bytes32 name);
+    event NodeAdded(address indexed node, bytes32 name);
 
     modifier onlyOwner() {
-        require(msg.sender == owner, "Not owner");
+        require(msg.sender == owner, "!owner");
         _;
     }
 
     constructor() {
         owner = msg.sender;
-        nodes[msg.sender] = Node(msg.sender, "Primary", true, true);
+        nodes[msg.sender] = Node("Primary", true, true);
         nodeList.push(msg.sender);
         nodeCount = 1;
     }
 
-    function registerDevice(address _addr, bytes32 _name, uint8 _perm) external onlyOwner {
-        require(devices[_addr].addr == address(0), "Exists");
-        devices[_addr] = Device(_addr, _name, true, _perm);
+    function addDevice(address _addr, bytes32 _name, uint8 _perm) external onlyOwner {
+        require(devices[_addr].name == bytes32(0), "exists");
+        devices[_addr] = Device(_name, true, _perm);
         deviceList.push(_addr);
         deviceCount++;
-        emit DeviceRegistered(_addr, _name);
+        emit DeviceAdded(_addr, _name);
     }
 
-    function registerNode(address _addr, bytes32 _name, bool _validator) external onlyOwner {
-        require(nodes[_addr].addr == address(0), "Exists");
-        nodes[_addr] = Node(_addr, _name, true, _validator);
+    function addNode(address _addr, bytes32 _name, bool _validator) external onlyOwner {
+        require(nodes[_addr].name == bytes32(0), "exists");
+        nodes[_addr] = Node(_name, true, _validator);
         nodeList.push(_addr);
         nodeCount++;
-        emit NodeRegistered(_addr, _name);
+        emit NodeAdded(_addr, _name);
     }
 
-    function recordData(bytes32 _hash) external {
+    function record(bytes32 _hash) external {
         Device storage d = devices[msg.sender];
-        require(d.active && d.permission >= 2 || msg.sender == owner, "No access");
-        dataCount++;
-        dataRecords[dataCount] = IoTData(dataCount, msg.sender, _hash, block.timestamp);
+        require((d.active && d.perm >= 2) || msg.sender == owner, "!auth");
+        unchecked { dataCount++; }
+        records[dataCount] = DataRecord(msg.sender, _hash, block.timestamp);
         emit DataRecorded(dataCount, msg.sender, _hash);
     }
 
-    function setDeviceStatus(address _addr, bool _active) external onlyOwner {
+    function setDeviceActive(address _addr, bool _active) external onlyOwner {
         devices[_addr].active = _active;
     }
 
-    function setNodeStatus(address _addr, bool _active) external onlyOwner {
+    function setNodeActive(address _addr, bool _active) external onlyOwner {
         nodes[_addr].active = _active;
     }
 
-    function getData(uint256 _id) external view returns (IoTData memory) {
-        return dataRecords[_id];
+    function getRecord(uint256 _id) external view returns (address, bytes32, uint256) {
+        DataRecord storage r = records[_id];
+        return (r.device, r.dataHash, r.timestamp);
     }
 
-    function getRecentData(uint256 _count) external view returns (IoTData[] memory) {
-        uint256 len = _count > dataCount ? dataCount : _count;
-        IoTData[] memory result = new IoTData[](len);
-        for (uint256 i = 0; i < len; i++) {
-            result[i] = dataRecords[dataCount - i];
-        }
-        return result;
+    function getDevice(address _addr) external view returns (bytes32, bool, uint8) {
+        Device storage d = devices[_addr];
+        return (d.name, d.active, d.perm);
     }
 
-    function getAllDevices() external view returns (Device[] memory) {
-        Device[] memory result = new Device[](deviceCount);
-        for (uint256 i = 0; i < deviceCount; i++) {
-            result[i] = devices[deviceList[i]];
-        }
-        return result;
+    function getNode(address _addr) external view returns (bytes32, bool, bool) {
+        Node storage n = nodes[_addr];
+        return (n.name, n.active, n.validator);
     }
 
-    function getAllNodes() external view returns (Node[] memory) {
-        Node[] memory result = new Node[](nodeCount);
-        for (uint256 i = 0; i < nodeCount; i++) {
-            result[i] = nodes[nodeList[i]];
-        }
-        return result;
+    function getDeviceAt(uint256 _index) external view returns (address) {
+        return deviceList[_index];
     }
 
-    function getStats() external view returns (uint256, uint256, uint256, uint256, uint256) {
-        uint256 activeDevices;
-        uint256 activeNodes;
-        for (uint256 i = 0; i < deviceCount; i++) {
-            if (devices[deviceList[i]].active) activeDevices++;
-        }
-        for (uint256 i = 0; i < nodeCount; i++) {
-            if (nodes[nodeList[i]].active) activeNodes++;
-        }
-        return (dataCount, deviceCount, nodeCount, activeDevices, activeNodes);
+    function getNodeAt(uint256 _index) external view returns (address) {
+        return nodeList[_index];
     }
 }
