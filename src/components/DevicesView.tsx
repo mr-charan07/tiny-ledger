@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { useBlockchain } from '@/hooks/useBlockchain';
+import { useData } from '@/hooks/useData';
 import { useWeb3 } from '@/contexts/Web3Context';
 import { DeviceCard } from './DeviceCard';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Plus, Search, Filter, Wallet, AlertCircle, RefreshCw } from 'lucide-react';
+import { Plus, Search, RefreshCw, Wallet, AlertCircle, LogIn } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -22,9 +22,13 @@ import {
 } from './ui/select';
 import { Label } from './ui/label';
 
-export function DevicesView() {
+interface DevicesViewProps {
+  onShowAuth?: () => void;
+}
+
+export function DevicesView({ onShowAuth }: DevicesViewProps) {
   const { isConnected, isCorrectNetwork, connectWallet, switchToSepolia } = useWeb3();
-  const { devices, registerDevice, fetchData, isLoading, isContractDeployed } = useBlockchain();
+  const { devices, registerDevice, fetchData, isLoading, isAuthenticated } = useData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newDevice, setNewDevice] = useState({
     address: '',
@@ -50,6 +54,16 @@ export function DevicesView() {
     }
   };
 
+  if (!isAuthenticated) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[40vh] space-y-4 animate-slide-in">
+        <LogIn className="h-12 w-12 text-muted-foreground" />
+        <p className="text-muted-foreground">Sign in to view devices</p>
+        <Button variant="cyber" onClick={onShowAuth}>Sign In</Button>
+      </div>
+    );
+  }
+
   if (!isConnected) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[40vh] space-y-4 animate-slide-in">
@@ -66,15 +80,6 @@ export function DevicesView() {
         <AlertCircle className="h-12 w-12 text-destructive" />
         <p className="text-muted-foreground">Switch to Sepolia network</p>
         <Button variant="cyber" onClick={switchToSepolia}>Switch Network</Button>
-      </div>
-    );
-  }
-
-  if (!isContractDeployed) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[40vh] space-y-4 animate-slide-in">
-        <AlertCircle className="h-12 w-12 text-warning" />
-        <p className="text-muted-foreground">Deploy the smart contract first</p>
       </div>
     );
   }
@@ -111,7 +116,7 @@ export function DevicesView() {
               <DialogHeader>
                 <DialogTitle>Register IoT Device</DialogTitle>
                 <DialogDescription>
-                  Add a new IoT device to the blockchain network
+                  Add a new IoT device to the registry
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">

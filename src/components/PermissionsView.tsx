@@ -1,10 +1,10 @@
 import { Button } from './ui/button';
 import { Shield, Eye, Edit, UserPlus, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useBlockchain } from '@/hooks/useBlockchain';
+import { useData } from '@/hooks/useData';
 
 export function PermissionsView() {
-  const { devices, nodes } = useBlockchain();
+  const { devices, nodes } = useData();
 
   const adminDevices = devices.filter(d => d.permission === 'admin');
   const writeDevices = devices.filter(d => d.permission === 'write');
