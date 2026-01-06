@@ -1,3 +1,4 @@
+import { useData } from '@/hooks/useData';
 import { useBlockchain } from '@/hooks/useBlockchain';
 import { useWeb3 } from '@/contexts/Web3Context';
 import { StatCard } from './StatCard';
@@ -6,13 +7,39 @@ import { NodeCard } from './NodeCard';
 import { DeviceCard } from './DeviceCard';
 import { TransactionRow } from './TransactionRow';
 import { BlockchainVisualizer } from './BlockchainVisualizer';
-import { Box, Server, Cpu, Clock, Database, ArrowUpDown, Wallet, AlertCircle } from 'lucide-react';
+import { Box, Server, Cpu, Clock, Database, ArrowUpDown, Wallet, AlertCircle, LogIn } from 'lucide-react';
 import { Button } from './ui/button';
 import { CONTRACT_ADDRESS } from '@/config/blockchain';
 
-export function Dashboard() {
+interface DashboardProps {
+  onShowAuth?: () => void;
+}
+
+export function Dashboard({ onShowAuth }: DashboardProps) {
   const { isConnected, isCorrectNetwork, connectWallet, switchToSepolia } = useWeb3();
-  const { stats, blocks, nodes, devices, transactions, isLoading, isContractDeployed } = useBlockchain();
+  const { isContractDeployed } = useBlockchain();
+  const { stats, blocks, nodes, devices, transactions, isLoading, isAuthenticated } = useData();
+
+  // Not authenticated state
+  if (!isAuthenticated) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 animate-slide-in">
+        <div className="p-6 rounded-full bg-primary/20 glow-primary">
+          <LogIn className="h-16 w-16 text-primary" />
+        </div>
+        <div className="text-center space-y-2">
+          <h2 className="text-2xl font-bold text-foreground">Sign In Required</h2>
+          <p className="text-muted-foreground max-w-md">
+            Sign in to access the IoT blockchain dashboard and manage your devices
+          </p>
+        </div>
+        <Button variant="cyber" size="lg" onClick={onShowAuth}>
+          <LogIn className="h-5 w-5 mr-2" />
+          Sign In
+        </Button>
+      </div>
+    );
+  }
 
   // Not connected state
   if (!isConnected) {
@@ -55,30 +82,8 @@ export function Dashboard() {
     );
   }
 
-  // Contract not deployed state
-  if (!isContractDeployed) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 animate-slide-in">
-        <div className="p-6 rounded-full bg-warning/20">
-          <AlertCircle className="h-16 w-16 text-warning" />
-        </div>
-        <div className="text-center space-y-4">
-          <h2 className="text-2xl font-bold text-foreground">Smart Contract Not Deployed</h2>
-          <p className="text-muted-foreground max-w-lg">
-            Deploy the IoT Blockchain smart contract to Sepolia and update the contract address in the configuration.
-          </p>
-          <div className="bg-secondary rounded-lg p-4 max-w-2xl">
-            <p className="text-sm text-muted-foreground mb-2">1. Deploy <code className="text-primary">contracts/IoTBlockchain.sol</code> to Sepolia</p>
-            <p className="text-sm text-muted-foreground mb-2">2. Copy the deployed contract address</p>
-            <p className="text-sm text-muted-foreground">3. Update <code className="text-primary">src/config/blockchain.ts</code>:</p>
-            <pre className="mt-2 p-2 bg-background rounded text-xs font-mono text-primary overflow-x-auto">
-              export const CONTRACT_ADDRESS = 'YOUR_CONTRACT_ADDRESS_HERE';
-            </pre>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Contract not deployed state (show warning but allow viewing DB data)
+  const showContractWarning = !isContractDeployed;
 
   // Loading state
   if (isLoading && !stats) {
@@ -86,7 +91,7 @@ export function Dashboard() {
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-pulse space-y-4 text-center">
           <div className="h-8 w-8 mx-auto border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-muted-foreground">Loading blockchain data...</p>
+          <p className="text-muted-foreground">Loading data...</p>
         </div>
       </div>
     );
@@ -94,6 +99,21 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6 animate-slide-in">
+      {/* Contract Warning */}
+      {showContractWarning && (
+        <div className="rounded-lg border border-warning/50 bg-warning/10 p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-warning mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-warning">Smart Contract Not Deployed</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Deploy <code className="text-primary">contracts/IoTBlockchain.sol</code> to Sepolia and update the address in <code className="text-primary">src/config/blockchain.ts</code> to enable blockchain proofs.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <StatCard

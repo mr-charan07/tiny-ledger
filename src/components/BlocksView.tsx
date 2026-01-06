@@ -1,14 +1,28 @@
-import { useBlockchain } from '@/hooks/useBlockchain';
+import { useData } from '@/hooks/useData';
 import { useWeb3 } from '@/contexts/Web3Context';
 import { BlockCard } from './BlockCard';
 import { BlockchainVisualizer } from './BlockchainVisualizer';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Search, Filter, Wallet, AlertCircle } from 'lucide-react';
+import { Search, Filter, Wallet, AlertCircle, LogIn } from 'lucide-react';
 
-export function BlocksView() {
+interface BlocksViewProps {
+  onShowAuth?: () => void;
+}
+
+export function BlocksView({ onShowAuth }: BlocksViewProps) {
   const { isConnected, isCorrectNetwork, connectWallet, switchToSepolia } = useWeb3();
-  const { blocks, isContractDeployed, isLoading } = useBlockchain();
+  const { blocks, isLoading, isAuthenticated } = useData();
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[40vh] space-y-4 animate-slide-in">
+        <LogIn className="h-12 w-12 text-muted-foreground" />
+        <p className="text-muted-foreground">Sign in to view blocks</p>
+        <Button variant="cyber" onClick={onShowAuth}>Sign In</Button>
+      </div>
+    );
+  }
 
   if (!isConnected) {
     return (
@@ -26,15 +40,6 @@ export function BlocksView() {
         <AlertCircle className="h-12 w-12 text-destructive" />
         <p className="text-muted-foreground">Switch to Sepolia network</p>
         <Button variant="cyber" onClick={switchToSepolia}>Switch Network</Button>
-      </div>
-    );
-  }
-
-  if (!isContractDeployed) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[40vh] space-y-4 animate-slide-in">
-        <AlertCircle className="h-12 w-12 text-warning" />
-        <p className="text-muted-foreground">Deploy the smart contract first</p>
       </div>
     );
   }

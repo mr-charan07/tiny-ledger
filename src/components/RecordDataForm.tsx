@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Send, Database, AlertCircle, CheckCircle, Copy } from 'lucide-react';
+import { Send, Database, AlertCircle, CheckCircle, Copy, LogIn } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useBlockchain } from '@/hooks/useBlockchain';
+import { useData } from '@/hooks/useData';
 import { useWeb3 } from '@/contexts/Web3Context';
 import { validateIoTData, validateDataIntegrity } from '@/lib/validation';
 import { generateTransactionToken, type TransactionToken } from '@/lib/tokenGeneration';
@@ -25,8 +26,13 @@ const DATA_TYPES = [
   'custom',
 ];
 
-export function RecordDataForm() {
-  const { recordData, isLoading, isContractDeployed, devices } = useBlockchain();
+interface RecordDataFormProps {
+  onShowAuth?: () => void;
+}
+
+export function RecordDataForm({ onShowAuth }: RecordDataFormProps) {
+  const { recordProof, isLoading: isBlockchainLoading, isContractDeployed } = useBlockchain();
+  const { devices, saveDataRecord, isAuthenticated, isLoading: isDataLoading } = useData();
   const { isConnected, account } = useWeb3();
   
   const [deviceName, setDeviceName] = useState('');
@@ -36,6 +42,7 @@ export function RecordDataForm() {
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [generatedToken, setGeneratedToken] = useState<TransactionToken | null>(null);
 
+  const isLoading = isBlockchainLoading || isDataLoading;
   const effectiveDataType = dataType === 'custom' ? customDataType : dataType;
 
   const validateForm = (): boolean => {
@@ -80,9 +87,38 @@ export function RecordDataForm() {
       account || undefined
     );
 
-    const success = await recordData(deviceName, effectiveDataType, parseFloat(value));
-    
-    if (success) {
+    // Find device address
+    const device = devices.find(d => d.name === deviceName);
+    const deviceAddress = device?.address || account || '0x0';
+
+    // Record proof on blockchain if contract is deployed
+    let recordId = Date.now();
+    let txHash: string | null = null;
+    let dataHash = token.token;
+
+    if (isContractDeployed && isConnected) {
+      const result = await recordProof(deviceName, effectiveDataType, parseFloat(value));
+      if (result) {
+        recordId = result.recordId;
+        txHash = result.txHash;
+        dataHash = result.dataHash;
+      }
+    }
+
+    // Save to database
+    const saved = await saveDataRecord(
+      recordId,
+      deviceAddress,
+      dataHash,
+      txHash,
+      {
+        temperature: effectiveDataType === 'temperature' ? parseFloat(value) : undefined,
+        humidity: effectiveDataType === 'humidity' ? parseFloat(value) : undefined,
+        raw: { deviceName, dataType: effectiveDataType, value: parseFloat(value) },
+      }
+    );
+
+    if (saved) {
       setGeneratedToken(token);
       // Reset form
       setDeviceName('');
@@ -90,6 +126,7 @@ export function RecordDataForm() {
       setCustomDataType('');
       setValue('');
       setValidationErrors([]);
+      toast.success('Data recorded successfully');
     }
   };
 
@@ -100,27 +137,39 @@ export function RecordDataForm() {
     }
   };
 
+  if (!isAuthenticated) {
+    return (
+      <Card className="border-primary/30 bg-card">
+        <CardContent className="p-8 text-center">
+          <LogIn className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground mb-4">Sign in to record data</p>
+          <Button variant="cyber" onClick={onShowAuth}>Sign In</Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <Card className="border-primary/30 bg-card">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Database className="h-4 w-4 text-primary" />
-            Record IoT Data to Blockchain
+            Record IoT Data
           </CardTitle>
         </CardHeader>
         <CardContent>
           {!isConnected && (
-            <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/30 flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-destructive" />
-              <span className="text-sm text-destructive">Connect wallet to record data</span>
+            <div className="mb-4 p-3 rounded-lg bg-warning/10 border border-warning/30 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-warning" />
+              <span className="text-sm text-warning">Connect wallet to record blockchain proofs</span>
             </div>
           )}
 
           {!isContractDeployed && isConnected && (
-            <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/30 flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-destructive" />
-              <span className="text-sm text-destructive">Deploy smart contract first</span>
+            <div className="mb-4 p-3 rounded-lg bg-warning/10 border border-warning/30 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-warning" />
+              <span className="text-sm text-warning">Contract not deployed - data will be saved to database only</span>
             </div>
           )}
 
@@ -207,7 +256,7 @@ export function RecordDataForm() {
 
             <Button 
               type="submit" 
-              disabled={isLoading || !isConnected || !isContractDeployed}
+              disabled={isLoading || !isAuthenticated}
               className="w-full"
             >
               {isLoading ? (

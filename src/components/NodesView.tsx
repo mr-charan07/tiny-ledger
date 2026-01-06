@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { useBlockchain } from '@/hooks/useBlockchain';
+import { useData } from '@/hooks/useData';
 import { useWeb3 } from '@/contexts/Web3Context';
 import { NodeCard } from './NodeCard';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Plus, RefreshCw, Wallet, AlertCircle } from 'lucide-react';
+import { Plus, RefreshCw, Wallet, AlertCircle, LogIn } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -16,9 +16,13 @@ import {
 import { Label } from './ui/label';
 import { Switch } from './ui/switch';
 
-export function NodesView() {
-  const { isConnected, isCorrectNetwork, connectWallet, switchToSepolia, account } = useWeb3();
-  const { nodes, registerNode, fetchData, isLoading, isContractDeployed } = useBlockchain();
+interface NodesViewProps {
+  onShowAuth?: () => void;
+}
+
+export function NodesView({ onShowAuth }: NodesViewProps) {
+  const { isConnected, isCorrectNetwork, connectWallet, switchToSepolia } = useWeb3();
+  const { nodes, registerNode, fetchData, isLoading, isAuthenticated } = useData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newNode, setNewNode] = useState({
     address: '',
@@ -39,6 +43,16 @@ export function NodesView() {
     }
   };
 
+  if (!isAuthenticated) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[40vh] space-y-4 animate-slide-in">
+        <LogIn className="h-12 w-12 text-muted-foreground" />
+        <p className="text-muted-foreground">Sign in to view nodes</p>
+        <Button variant="cyber" onClick={onShowAuth}>Sign In</Button>
+      </div>
+    );
+  }
+
   if (!isConnected) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[40vh] space-y-4 animate-slide-in">
@@ -55,15 +69,6 @@ export function NodesView() {
         <AlertCircle className="h-12 w-12 text-destructive" />
         <p className="text-muted-foreground">Switch to Sepolia network</p>
         <Button variant="cyber" onClick={switchToSepolia}>Switch Network</Button>
-      </div>
-    );
-  }
-
-  if (!isContractDeployed) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[40vh] space-y-4 animate-slide-in">
-        <AlertCircle className="h-12 w-12 text-warning" />
-        <p className="text-muted-foreground">Deploy the smart contract first</p>
       </div>
     );
   }
@@ -94,7 +99,7 @@ export function NodesView() {
               <DialogHeader>
                 <DialogTitle>Register New Node</DialogTitle>
                 <DialogDescription>
-                  Add a new node to the permissioned blockchain network
+                  Add a new node to the network
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">

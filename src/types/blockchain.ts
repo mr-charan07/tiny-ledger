@@ -13,9 +13,10 @@ export interface IoTTransaction {
   id: string;
   deviceId: string;
   deviceName: string;
-  data: Record<string, number | string>;
+  data: Record<string, number | string | null | undefined>;
   timestamp: Date;
   signature: string;
+  txHash?: string | null;
 }
 
 export interface Node {
@@ -36,6 +37,7 @@ export interface IoTDevice {
   lastReading: Date;
   transactionCount: number;
   permission: 'read' | 'write' | 'admin';
+  address?: string;
 }
 
 export interface BlockchainStats {

@@ -14,7 +14,117 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      data_records: {
+        Row: {
+          created_at: string
+          data_hash: string
+          device_address: string
+          humidity: number | null
+          id: string
+          raw_data: Json | null
+          record_id: number
+          temperature: number | null
+          tx_hash: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data_hash: string
+          device_address: string
+          humidity?: number | null
+          id?: string
+          raw_data?: Json | null
+          record_id: number
+          temperature?: number | null
+          tx_hash?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data_hash?: string
+          device_address?: string
+          humidity?: number | null
+          id?: string
+          raw_data?: Json | null
+          record_id?: number
+          temperature?: number | null
+          tx_hash?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      devices: {
+        Row: {
+          active: boolean
+          address: string
+          created_at: string
+          device_type: string | null
+          id: string
+          location: string | null
+          name: string
+          permission_level: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          address: string
+          created_at?: string
+          device_type?: string | null
+          id?: string
+          location?: string | null
+          name: string
+          permission_level?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          address?: string
+          created_at?: string
+          device_type?: string | null
+          id?: string
+          location?: string | null
+          name?: string
+          permission_level?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      nodes: {
+        Row: {
+          active: boolean
+          address: string
+          created_at: string
+          id: string
+          is_validator: boolean
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          address: string
+          created_at?: string
+          id?: string
+          is_validator?: boolean
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          address?: string
+          created_at?: string
+          id?: string
+          is_validator?: boolean
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

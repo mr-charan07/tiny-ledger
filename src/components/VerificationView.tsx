@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Search, CheckCircle, XCircle, FileText, Shield, Hash, Clock } from 'lucide-react';
+import { Search, CheckCircle, XCircle, FileText, Shield, Hash, Clock, LogIn } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useBlockchain } from '@/hooks/useBlockchain';
+import { useData } from '@/hooks/useData';
 import { validateToken } from '@/lib/validation';
 import { formatTokenForDisplay } from '@/lib/tokenGeneration';
 import { toast } from 'sonner';
@@ -21,8 +21,12 @@ interface VerificationResult {
   blockHash?: string;
 }
 
-export function VerificationView() {
-  const { transactions, isContractDeployed } = useBlockchain();
+interface VerificationViewProps {
+  onShowAuth?: () => void;
+}
+
+export function VerificationView({ onShowAuth }: VerificationViewProps) {
+  const { transactions, isAuthenticated } = useData();
   const [searchToken, setSearchToken] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
@@ -50,12 +54,16 @@ export function VerificationView() {
       );
 
       if (matchedTx) {
+        const dataKeys = Object.keys(matchedTx.data).filter(k => k !== 'hash');
+        const dataType = dataKeys[0] || 'unknown';
+        const dataValue = matchedTx.data[dataType];
+        
         setVerificationResult({
           verified: true,
           recordId: matchedTx.id,
           deviceName: matchedTx.deviceName,
-          dataType: Object.keys(matchedTx.data)[0],
-          value: Object.values(matchedTx.data)[0] as number,
+          dataType,
+          value: typeof dataValue === 'number' ? dataValue : undefined,
           timestamp: matchedTx.timestamp,
           signature: matchedTx.signature,
         });
@@ -63,7 +71,7 @@ export function VerificationView() {
       } else {
         setVerificationResult({ verified: false });
         toast.error('Token verification failed', {
-          description: 'No matching record found on blockchain'
+          description: 'No matching record found'
         });
       }
     } catch (error) {
@@ -80,6 +88,16 @@ export function VerificationView() {
     setVerificationResult(null);
   };
 
+  if (!isAuthenticated) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[40vh] space-y-4 animate-slide-in">
+        <LogIn className="h-12 w-12 text-muted-foreground" />
+        <p className="text-muted-foreground">Sign in to verify tokens</p>
+        <Button variant="cyber" onClick={onShowAuth}>Sign In</Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -89,20 +107,10 @@ export function VerificationView() {
             Token Verification
           </h1>
           <p className="text-muted-foreground mt-1">
-            Verify IoT data transactions using blockchain tokens
+            Verify IoT data transactions using tokens
           </p>
         </div>
       </div>
-
-      {!isContractDeployed && (
-        <Card className="border-destructive/50 bg-destructive/10">
-          <CardContent className="p-4">
-            <p className="text-destructive text-sm font-medium">
-              Smart contract not deployed. Please deploy the contract to enable verification.
-            </p>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Verification Input */}
       <Card className="border-primary/30 bg-card">
@@ -119,11 +127,10 @@ export function VerificationView() {
               value={searchToken}
               onChange={(e) => setSearchToken(e.target.value)}
               className="font-mono text-sm"
-              disabled={!isContractDeployed}
             />
             <Button 
               onClick={handleVerify} 
-              disabled={!searchToken || isVerifying || !isContractDeployed}
+              disabled={!searchToken || isVerifying}
               className="min-w-[120px]"
             >
               {isVerifying ? 'Verifying...' : 'Verify Token'}
@@ -203,7 +210,7 @@ export function VerificationView() {
                   <div>
                     <span className="text-sm text-muted-foreground">Value:</span>
                     <span className="ml-2 font-mono text-primary font-bold">
-                      {verificationResult.value}
+                      {verificationResult.value ?? 'N/A'}
                     </span>
                   </div>
                   <div>
@@ -242,32 +249,38 @@ export function VerificationView() {
             </p>
           ) : (
             <div className="space-y-2">
-              {transactions.slice(0, 5).map((tx) => (
-                <div 
-                  key={tx.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
-                  onClick={() => {
-                    setSearchToken(tx.id);
-                    setVerificationResult(null);
-                  }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-2 w-2 rounded-full bg-accent" />
-                    <span className="font-mono text-sm">{tx.deviceName}</span>
-                    <Badge variant="outline" className="text-xs">
-                      {Object.keys(tx.data)[0]}
-                    </Badge>
+              {transactions.slice(0, 5).map((tx) => {
+                const dataKeys = Object.keys(tx.data).filter(k => k !== 'hash');
+                const dataType = dataKeys[0] || 'data';
+                const dataValue = tx.data[dataType];
+                
+                return (
+                  <div 
+                    key={tx.id}
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => {
+                      setSearchToken(tx.id);
+                      setVerificationResult(null);
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-2 w-2 rounded-full bg-accent" />
+                      <span className="font-mono text-sm">{tx.deviceName}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {dataType}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className="font-mono text-sm text-primary">
+                        {typeof dataValue === 'number' ? dataValue : String(dataValue ?? '')}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {tx.timestamp.toLocaleTimeString()}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <span className="font-mono text-sm text-primary">
-                      {Object.values(tx.data)[0]}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {tx.timestamp.toLocaleTimeString()}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Web3Provider } from '@/contexts/Web3Context';
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
@@ -9,24 +10,56 @@ import { DevicesView } from '@/components/DevicesView';
 import { PermissionsView } from '@/components/PermissionsView';
 import { RecordDataForm } from '@/components/RecordDataForm';
 import { VerificationView } from '@/components/VerificationView';
+import { AuthForm } from '@/components/AuthForm';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [showAuth, setShowAuth] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsAuthenticated(!!user);
+    };
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setIsAuthenticated(!!session?.user);
+      if (session?.user) {
+        setShowAuth(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleShowAuth = () => {
+    setShowAuth(true);
+  };
+
+  const handleAuthSuccess = () => {
+    setShowAuth(false);
+  };
 
   const renderContent = () => {
+    if (showAuth) {
+      return <AuthForm onSuccess={handleAuthSuccess} />;
+    }
+
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard />;
+        return <Dashboard onShowAuth={handleShowAuth} />;
       case 'record':
-        return <RecordDataForm />;
+        return <RecordDataForm onShowAuth={handleShowAuth} />;
       case 'verify':
-        return <VerificationView />;
+        return <VerificationView onShowAuth={handleShowAuth} />;
       case 'blocks':
-        return <BlocksView />;
+        return <BlocksView onShowAuth={handleShowAuth} />;
       case 'nodes':
-        return <NodesView />;
+        return <NodesView onShowAuth={handleShowAuth} />;
       case 'devices':
-        return <DevicesView />;
+        return <DevicesView onShowAuth={handleShowAuth} />;
       case 'permissions':
         return <PermissionsView />;
       default:
@@ -41,9 +74,15 @@ const Index = () => {
   return (
     <Web3Provider>
       <div className="min-h-screen bg-background grid-pattern">
-        <Header />
+        <Header 
+          isAuthenticated={isAuthenticated} 
+          onShowAuth={handleShowAuth}
+        />
         <div className="flex">
-          <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+          <Sidebar activeTab={activeTab} onTabChange={(tab) => {
+            setShowAuth(false);
+            setActiveTab(tab);
+          }} />
           <main className="flex-1 p-6 overflow-auto">
             <div className="max-w-7xl mx-auto">
               {renderContent()}

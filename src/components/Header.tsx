@@ -1,13 +1,19 @@
-import { Box, Settings, Bell, Search, Wallet, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Box, Settings, Bell, Search, Wallet, AlertTriangle, ExternalLink, LogIn, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { useWeb3 } from '@/contexts/Web3Context';
-import { SEPOLIA_CHAIN_ID, getEtherscanLink } from '@/config/blockchain';
+import { getEtherscanLink } from '@/config/blockchain';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
-export function Header() {
+interface HeaderProps {
+  isAuthenticated?: boolean;
+  onShowAuth?: () => void;
+}
+
+export function Header({ isAuthenticated, onShowAuth }: HeaderProps) {
   const { 
     account, 
-    chainId, 
     isConnecting, 
     isConnected, 
     isCorrectNetwork,
@@ -18,6 +24,11 @@ export function Header() {
 
   const formatAddress = (addr: string) => 
     `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    toast.success('Signed out');
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -67,6 +78,28 @@ export function Header() {
             <Settings className="h-5 w-5" />
           </Button>
 
+          {/* Auth buttons */}
+          {isAuthenticated ? (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={handleSignOut}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign Out
+            </Button>
+          ) : (
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={onShowAuth}
+            >
+              <LogIn className="h-4 w-4 mr-2" />
+              Sign In
+            </Button>
+          )}
+
+          {/* Wallet connection */}
           {isConnected ? (
             <div className="flex items-center gap-2">
               <a 
