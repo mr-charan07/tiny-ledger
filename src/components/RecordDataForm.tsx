@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Send, Database, AlertCircle, CheckCircle, Copy, LogIn } from 'lucide-react';
+import { Send, Database, AlertCircle, CheckCircle, Copy, LogIn, ExternalLink, Shield } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { useWeb3 } from '@/contexts/Web3Context';
 import { validateIoTData, validateDataIntegrity } from '@/lib/validation';
 import { generateTransactionToken, type TransactionToken } from '@/lib/tokenGeneration';
 import { toast } from 'sonner';
+import { getEtherscanLink } from '@/config/blockchain';
 
 const DATA_TYPES = [
   'temperature',
@@ -41,6 +42,8 @@ export function RecordDataForm({ onShowAuth }: RecordDataFormProps) {
   const [value, setValue] = useState('');
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [generatedToken, setGeneratedToken] = useState<TransactionToken | null>(null);
+  const [recordedDataHash, setRecordedDataHash] = useState<string | null>(null);
+  const [recordedTxHash, setRecordedTxHash] = useState<string | null>(null);
 
   const isLoading = isBlockchainLoading || isDataLoading;
   const effectiveDataType = dataType === 'custom' ? customDataType : dataType;
@@ -102,7 +105,12 @@ export function RecordDataForm({ onShowAuth }: RecordDataFormProps) {
         recordId = result.recordId;
         txHash = result.txHash;
         dataHash = result.dataHash;
+        setRecordedDataHash(result.dataHash);
+        setRecordedTxHash(result.txHash);
       }
+    } else {
+      setRecordedDataHash(dataHash);
+      setRecordedTxHash(null);
     }
 
     // Save to database
@@ -130,11 +138,9 @@ export function RecordDataForm({ onShowAuth }: RecordDataFormProps) {
     }
   };
 
-  const copyToken = () => {
-    if (generatedToken) {
-      navigator.clipboard.writeText(generatedToken.token);
-      toast.success('Token copied to clipboard');
-    }
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied to clipboard`);
   };
 
   if (!isAuthenticated) {
@@ -272,57 +278,97 @@ export function RecordDataForm({ onShowAuth }: RecordDataFormProps) {
         </CardContent>
       </Card>
 
-      {/* Generated Token Display */}
-      {generatedToken && (
+      {(generatedToken || recordedDataHash) && (
         <Card className="border-accent/50 bg-accent/5">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-accent" />
-              Transaction Token Generated
+              Data Recorded Successfully
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="p-3 rounded-lg bg-background border border-border">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Full Token:</span>
-                <Button variant="ghost" size="sm" onClick={copyToken}>
+            {/* Data Hash for Verification - Most Important */}
+            <div className="p-4 rounded-lg bg-primary/10 border border-primary/30">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-primary flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  Verification Hash
+                </span>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => copyToClipboard(recordedDataHash || generatedToken?.token || '', 'Hash')}
+                  className="border-primary/50 text-primary hover:bg-primary/10"
+                >
                   <Copy className="h-3 w-3 mr-1" />
-                  Copy
+                  Copy Hash
                 </Button>
               </div>
-              <code className="text-xs font-mono text-primary break-all block mt-1">
-                {generatedToken.token}
+              <code className="text-sm font-mono text-foreground break-all block bg-background/50 p-2 rounded">
+                {recordedDataHash || generatedToken?.token}
               </code>
+              <p className="text-xs text-muted-foreground mt-2">
+                Use this hash in the Verification tab to verify your data integrity
+              </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <span className="text-muted-foreground">Device:</span>
-                <Badge variant="secondary" className="ml-2">
-                  {generatedToken.deviceName}
-                </Badge>
+            {/* Transaction Hash if available */}
+            {recordedTxHash && (
+              <div className="p-3 rounded-lg bg-background border border-border">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Blockchain Transaction:</span>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => copyToClipboard(recordedTxHash, 'Transaction hash')}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                    <a 
+                      href={getEtherscanLink('tx', recordedTxHash)} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                    >
+                      <Button variant="ghost" size="sm">
+                        <ExternalLink className="h-3 w-3" />
+                      </Button>
+                    </a>
+                  </div>
+                </div>
+                <code className="text-xs font-mono text-muted-foreground break-all block mt-1">
+                  {recordedTxHash}
+                </code>
               </div>
-              <div>
-                <span className="text-muted-foreground">Type:</span>
-                <Badge variant="outline" className="ml-2">
-                  {generatedToken.dataType}
-                </Badge>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Value:</span>
-                <span className="ml-2 font-mono text-primary">{generatedToken.value}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Time:</span>
-                <span className="ml-2 font-mono text-xs">
-                  {new Date(generatedToken.timestamp).toLocaleTimeString()}
-                </span>
-              </div>
-            </div>
+            )}
 
-            <p className="text-xs text-muted-foreground">
-              Save this token to verify your data later. You can use it in the Verification tab.
-            </p>
+            {/* Token Details */}
+            {generatedToken && (
+              <div className="grid grid-cols-2 gap-3 text-sm pt-2 border-t border-border">
+                <div>
+                  <span className="text-muted-foreground">Device:</span>
+                  <Badge variant="secondary" className="ml-2">
+                    {generatedToken.deviceName}
+                  </Badge>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Type:</span>
+                  <Badge variant="outline" className="ml-2">
+                    {generatedToken.dataType}
+                  </Badge>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Value:</span>
+                  <span className="ml-2 font-mono text-primary">{generatedToken.value}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Time:</span>
+                  <span className="ml-2 font-mono text-xs">
+                    {new Date(generatedToken.timestamp).toLocaleTimeString()}
+                  </span>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
