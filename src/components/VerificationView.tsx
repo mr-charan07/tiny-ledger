@@ -47,11 +47,18 @@ export function VerificationView({ onShowAuth }: VerificationViewProps) {
       // Simulate verification delay for UX
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Search in transactions by matching signature
-      const matchedTx = transactions.find(tx => 
-        tx.signature.toLowerCase().includes(searchToken.toLowerCase().slice(2, 10)) ||
-        tx.id.toLowerCase().includes(searchToken.toLowerCase())
-      );
+      // Search in transactions by matching data hash, tx hash, or ID
+      const normalizedToken = searchToken.toLowerCase();
+      const matchedTx = transactions.find(tx => {
+        const dataHash = typeof tx.data?.hash === 'string' ? tx.data.hash.toLowerCase() : '';
+        const txHash = tx.txHash?.toLowerCase() || '';
+        const txId = tx.id.toLowerCase();
+        
+        return dataHash === normalizedToken || 
+               txHash === normalizedToken ||
+               txId === normalizedToken ||
+               txId === normalizedToken.replace('tx-', '');
+      });
 
       if (matchedTx) {
         const dataKeys = Object.keys(matchedTx.data).filter(k => k !== 'hash');
