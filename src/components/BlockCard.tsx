@@ -1,7 +1,10 @@
 import { Block } from '@/types/blockchain';
 import { formatDistanceToNow } from 'date-fns';
-import { Box, Clock, Hash, User } from 'lucide-react';
+import { Box, Clock, Hash, User, Copy, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useState } from 'react';
+import { Button } from './ui/button';
+import { toast } from '@/hooks/use-toast';
 
 interface BlockCardProps {
   block: Block;
@@ -9,8 +12,21 @@ interface BlockCardProps {
 }
 
 export function BlockCard({ block, isLatest }: BlockCardProps) {
+  const [copied, setCopied] = useState(false);
+
   const truncateHash = (hash: string) => {
     return `${hash.slice(0, 10)}...${hash.slice(-8)}`;
+  };
+
+  const copyHash = async () => {
+    try {
+      await navigator.clipboard.writeText(block.hash);
+      setCopied(true);
+      toast({ title: 'Hash copied to clipboard' });
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast({ title: 'Failed to copy', variant: 'destructive' });
+    }
   };
 
   return (
@@ -43,9 +59,21 @@ export function BlockCard({ block, isLatest }: BlockCardProps) {
         <div className="flex items-center gap-2">
           <Hash className="h-3 w-3 text-muted-foreground flex-shrink-0" />
           <span className="text-muted-foreground">Hash:</span>
-          <code className="font-mono text-xs text-foreground truncate">
+          <code className="font-mono text-xs text-foreground truncate flex-1">
             {truncateHash(block.hash)}
           </code>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 flex-shrink-0"
+            onClick={copyHash}
+          >
+            {copied ? (
+              <Check className="h-3 w-3 text-green-500" />
+            ) : (
+              <Copy className="h-3 w-3 text-muted-foreground" />
+            )}
+          </Button>
         </div>
         
         <div className="flex items-center gap-2">
