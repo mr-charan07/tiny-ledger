@@ -150,8 +150,8 @@ export function Dashboard({ onShowAuth }: DashboardProps) {
         />
         <StatCard
           title="Storage Used"
-          value={`${stats?.storageUsed?.toFixed(2) || '0'} MB`}
-          subtitle="Low overhead"
+          value={`${stats?.storageUsed?.toFixed(2) || '0'} KB`}
+          subtitle={`${stats?.totalBlocks || 0} records`}
           icon={Database}
           trend="neutral"
         />
