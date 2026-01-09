@@ -128,13 +128,13 @@ export function Dashboard({ onShowAuth }: DashboardProps) {
           icon={ArrowUpDown}
           trend="up"
         />
-        <StatCard
+        {/* <StatCard
           title="Active Nodes"
           value={stats?.activeNodes || 0}
           subtitle={`of ${nodes.length} total`}
           icon={Server}
           trend="neutral"
-        />
+        /> */}
         <StatCard
           title="IoT Devices"
           value={stats?.activeDevices || 0}

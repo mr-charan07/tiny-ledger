@@ -41,9 +41,6 @@ export function Header({ isAuthenticated, onShowAuth }: HeaderProps) {
             <h1 className="text-lg font-bold font-mono text-primary text-glow-primary">
               IoT-CHAIN
             </h1>
-            <p className="text-xs text-muted-foreground">
-              Sepolia Testnet
-            </p>
           </div>
         </div>
 
@@ -70,13 +67,13 @@ export function Header({ isAuthenticated, onShowAuth }: HeaderProps) {
             </Button>
           )}
 
-          <Button variant="ghost" size="icon" className="relative">
+          {/* <Button variant="ghost" size="icon" className="relative">
             <Bell className="h-5 w-5" />
             <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-accent animate-pulse" />
           </Button>
           <Button variant="ghost" size="icon">
             <Settings className="h-5 w-5" />
-          </Button>
+          </Button> */}
 
           {/* Auth buttons */}
           {isAuthenticated ? (
