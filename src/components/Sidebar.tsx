@@ -21,11 +21,11 @@ const navItems = [
   { id: 'record', label: 'Record Data', icon: Database },
   { id: 'verify', label: 'Verification', icon: CheckCircle },
   { id: 'blocks', label: 'Blocks', icon: Box },
-  { id: 'nodes', label: 'Nodes', icon: Server },
+  // { id: 'nodes', label: 'Nodes', icon: Server },
   { id: 'devices', label: 'IoT Devices', icon: Cpu },
   { id: 'permissions', label: 'Permissions', icon: Shield },
-  { id: 'analytics', label: 'Analytics', icon: Activity },
-  { id: 'logs', label: 'Logs', icon: FileText },
+  // { id: 'analytics', label: 'Analytics', icon: Activity },
+  // { id: 'logs', label: 'Logs', icon: FileText },
 ];
 
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
@@ -63,9 +63,9 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
             <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
             <span className="text-xs font-medium text-sidebar-foreground">Network Status</span>
           </div>
-          <p className="text-xs text-muted-foreground">
+          {/* <p className="text-xs text-muted-foreground">
             4 nodes active • 12.4 MB used
-          </p>
+          </p> */}
         </div>
       </div>
     </aside>
