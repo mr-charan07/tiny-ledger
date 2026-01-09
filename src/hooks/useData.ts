@@ -159,13 +159,33 @@ export function useData() {
       const activeDevices = mappedDevices.filter((d) => d.status === 'online').length;
       const activeNodes = mappedNodes.filter((n) => n.status === 'active').length;
 
+      // Calculate actual storage used based on data records
+      const storageBytes = dbRecords.reduce((total, record) => {
+        // Estimate size of each record in bytes
+        const recordSize = 
+          (record.data_hash?.length || 0) + 
+          (record.tx_hash?.length || 0) + 
+          (record.device_address?.length || 0) +
+          (record.raw_data ? JSON.stringify(record.raw_data).length : 0) +
+          8 + // temperature (numeric)
+          8 + // humidity (numeric)
+          36 + // uuid id
+          8 + // record_id (bigint)
+          36 + // user_id uuid
+          24; // timestamp
+        return total + recordSize;
+      }, 0);
+      
+      // Convert bytes to KB (divide by 1024)
+      const storageKB = storageBytes / 1024;
+
       setStats({
         totalBlocks: dbRecords.length,
         totalTransactions: dbRecords.length,
         activeNodes,
         activeDevices,
         avgBlockTime: 12,
-        storageUsed: dbRecords.length * 0.001,
+        storageUsed: storageKB,
       });
     } catch (error) {
       console.error('Error fetching data:', error);
