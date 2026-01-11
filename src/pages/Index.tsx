@@ -11,11 +11,14 @@ import { PermissionsView } from '@/components/PermissionsView';
 import { RecordDataForm } from '@/components/RecordDataForm';
 import { VerificationView } from '@/components/VerificationView';
 import { AuthForm } from '@/components/AuthForm';
+import { AdminView } from '@/components/AdminView';
+import { useAdmin } from '@/hooks/useAdmin';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showAuth, setShowAuth] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { isAdmin } = useAdmin();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -62,6 +65,8 @@ const Index = () => {
         return <DevicesView onShowAuth={handleShowAuth} />;
       case 'permissions':
         return <PermissionsView />;
+      case 'admin':
+        return <AdminView onShowAuth={handleShowAuth} />;
       default:
         return (
           <div className="flex items-center justify-center h-64 text-muted-foreground">
@@ -79,10 +84,14 @@ const Index = () => {
           onShowAuth={handleShowAuth}
         />
         <div className="flex">
-          <Sidebar activeTab={activeTab} onTabChange={(tab) => {
-            setShowAuth(false);
-            setActiveTab(tab);
-          }} />
+          <Sidebar 
+            activeTab={activeTab} 
+            onTabChange={(tab) => {
+              setShowAuth(false);
+              setActiveTab(tab);
+            }}
+            isAdmin={isAdmin}
+          />
           <main className="flex-1 p-6 overflow-auto">
             <div className="max-w-7xl mx-auto">
               {renderContent()}

@@ -8,12 +8,14 @@ import {
   Activity,
   FileText,
   Database,
-  CheckCircle
+  CheckCircle,
+  ShieldCheck
 } from 'lucide-react';
 
 interface SidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
+  isAdmin?: boolean;
 }
 
 const navItems = [
@@ -28,13 +30,20 @@ const navItems = [
   // { id: 'logs', label: 'Logs', icon: FileText },
 ];
 
-export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
+const adminItems = [
+  { id: 'admin', label: 'Admin Panel', icon: ShieldCheck },
+];
+
+export function Sidebar({ activeTab, onTabChange, isAdmin }: SidebarProps) {
+  const allItems = isAdmin ? [...navItems, ...adminItems] : navItems;
+
   return (
     <aside className="hidden lg:flex flex-col w-56 border-r border-border bg-sidebar h-[calc(100vh-4rem)]">
       <nav className="flex-1 p-3 space-y-1">
-        {navItems.map((item) => {
+        {allItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
+          const isAdminItem = item.id === 'admin';
           
           return (
             <button
@@ -44,12 +53,14 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
                 "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
                 isActive 
                   ? "bg-primary/20 text-primary glow-primary" 
-                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                isAdminItem && !isActive && "border border-primary/30 mt-4"
               )}
             >
               <Icon className={cn(
                 "h-4 w-4",
-                isActive && "text-glow-primary"
+                isActive && "text-glow-primary",
+                isAdminItem && "text-primary"
               )} />
               {item.label}
             </button>
