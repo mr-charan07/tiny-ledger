@@ -23,12 +23,22 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) throw error;
+
+      // Log login activity
+      if (data.user) {
+        await supabase.from('login_activity').insert({
+          user_id: data.user.id,
+          email: data.user.email || email,
+          action: 'login',
+        });
+      }
+
       toast.success('Signed in successfully');
       onSuccess?.();
     } catch (error: unknown) {

@@ -13,10 +13,21 @@ interface UserProfile {
   role: 'admin' | 'moderator' | 'user' | null;
 }
 
+interface LoginActivity {
+  id: string;
+  user_id: string;
+  email: string;
+  action: 'login' | 'logout';
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string;
+}
+
 export function useAdmin() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [users, setUsers] = useState<UserProfile[]>([]);
+  const [loginActivity, setLoginActivity] = useState<LoginActivity[]>([]);
   const { toast } = useToast();
 
   // Check if current user is admin
@@ -86,6 +97,30 @@ export function useAdmin() {
       toast({
         title: 'Error',
         description: 'Failed to fetch users',
+        variant: 'destructive',
+      });
+    }
+  }, [isAdmin, toast]);
+
+  // Fetch all login activity (admin only)
+  const fetchLoginActivity = useCallback(async () => {
+    if (!isAdmin) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('login_activity')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
+      setLoginActivity((data || []) as LoginActivity[]);
+    } catch (error) {
+      console.error('Error fetching login activity:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch login activity',
         variant: 'destructive',
       });
     }
@@ -182,14 +217,17 @@ export function useAdmin() {
   useEffect(() => {
     if (isAdmin) {
       fetchUsers();
+      fetchLoginActivity();
     }
-  }, [isAdmin, fetchUsers]);
+  }, [isAdmin, fetchUsers, fetchLoginActivity]);
 
   return {
     isAdmin,
     isLoading,
     users,
+    loginActivity,
     fetchUsers,
+    fetchLoginActivity,
     toggleUserStatus,
     assignRole,
     removeRole,

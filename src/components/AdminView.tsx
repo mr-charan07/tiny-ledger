@@ -25,15 +25,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog';
-import { Shield, ShieldAlert, ShieldCheck, User, UserX, RefreshCw, AlertCircle } from 'lucide-react';
+import { Shield, ShieldAlert, ShieldCheck, User, UserX, RefreshCw, AlertCircle, LogIn, LogOut, Clock } from 'lucide-react';
 import { format } from 'date-fns';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 
 interface AdminViewProps {
   onShowAuth?: () => void;
 }
 
 export function AdminView({ onShowAuth }: AdminViewProps) {
-  const { isAdmin, isLoading, users, fetchUsers, toggleUserStatus, assignRole, removeRole } = useAdmin();
+  const { isAdmin, isLoading, users, loginActivity, fetchUsers, fetchLoginActivity, toggleUserStatus, assignRole, removeRole } = useAdmin();
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     userId: string;
@@ -103,17 +104,17 @@ export function AdminView({ onShowAuth }: AdminViewProps) {
             Admin Control Panel
           </h1>
           <p className="text-muted-foreground mt-1">
-            Manage user accounts, roles, and access permissions
+          Manage user accounts, roles, access permissions, and view login activity
           </p>
         </div>
-        <Button variant="outline" onClick={fetchUsers}>
+        <Button variant="outline" onClick={() => { fetchUsers(); fetchLoginActivity(); }}>
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-sm text-muted-foreground">Total Users</p>
           <p className="text-2xl font-bold text-foreground">{users.length}</p>
@@ -130,109 +131,176 @@ export function AdminView({ onShowAuth }: AdminViewProps) {
           <p className="text-sm text-muted-foreground">Deactivated</p>
           <p className="text-2xl font-bold text-destructive">{users.filter(u => !u.is_active).length}</p>
         </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-sm text-muted-foreground">Login Events</p>
+          <p className="text-2xl font-bold text-primary">{loginActivity.length}</p>
+        </div>
       </div>
 
-      {/* Users Table */}
-      <div className="rounded-lg border border-border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Email</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead>Last Login</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {users.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  No users found
-                </TableCell>
-              </TableRow>
-            ) : (
-              users.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      <div className={`h-2 w-2 rounded-full ${user.is_active ? 'bg-accent' : 'bg-destructive'}`} />
-                      {user.email}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {user.is_active ? (
-                      <Badge className="bg-accent/20 text-accent border-accent/30">Active</Badge>
-                    ) : (
-                      <Badge className="bg-destructive/20 text-destructive border-destructive/30">Deactivated</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>{getRoleBadge(user.role)}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {format(new Date(user.created_at), 'MMM d, yyyy')}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {user.last_login_at ? format(new Date(user.last_login_at), 'MMM d, yyyy HH:mm') : 'Never'}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Select
-                        value={user.role || 'none'}
-                        onValueChange={(value) => {
-                          if (value === 'none') {
-                            setConfirmDialog({
+      {/* Tabs for Users and Login Activity */}
+      <Tabs defaultValue="users" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="users" className="gap-2">
+            <User className="h-4 w-4" />
+            Users
+          </TabsTrigger>
+          <TabsTrigger value="activity" className="gap-2">
+            <Clock className="h-4 w-4" />
+            Login Activity
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="users" className="mt-4">
+          {/* Users Table */}
+          <div className="rounded-lg border border-border bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Last Login</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {users.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      No users found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  users.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <div className={`h-2 w-2 rounded-full ${user.is_active ? 'bg-accent' : 'bg-destructive'}`} />
+                          {user.email}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {user.is_active ? (
+                          <Badge className="bg-accent/20 text-accent border-accent/30">Active</Badge>
+                        ) : (
+                          <Badge className="bg-destructive/20 text-destructive border-destructive/30">Deactivated</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>{getRoleBadge(user.role)}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {format(new Date(user.created_at), 'MMM d, yyyy')}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {user.last_login_at ? format(new Date(user.last_login_at), 'MMM d, yyyy HH:mm') : 'Never'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Select
+                            value={user.role || 'none'}
+                            onValueChange={(value) => {
+                              if (value === 'none') {
+                                setConfirmDialog({
+                                  open: true,
+                                  userId: user.user_id,
+                                  action: 'remove-role',
+                                  userName: user.email,
+                                });
+                              } else {
+                                assignRole(user.user_id, value as 'admin' | 'moderator' | 'user');
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="w-[120px] h-8">
+                              <SelectValue placeholder="Set Role" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="moderator">Moderator</SelectItem>
+                              <SelectItem value="user">User</SelectItem>
+                              <SelectItem value="none">Remove Role</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant={user.is_active ? 'destructive' : 'outline'}
+                            size="sm"
+                            onClick={() => setConfirmDialog({
                               open: true,
                               userId: user.user_id,
-                              action: 'remove-role',
+                              action: user.is_active ? 'deactivate' : 'activate',
                               userName: user.email,
-                            });
-                          } else {
-                            assignRole(user.user_id, value as 'admin' | 'moderator' | 'user');
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="w-[120px] h-8">
-                          <SelectValue placeholder="Set Role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="moderator">Moderator</SelectItem>
-                          <SelectItem value="user">User</SelectItem>
-                          <SelectItem value="none">Remove Role</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        variant={user.is_active ? 'destructive' : 'outline'}
-                        size="sm"
-                        onClick={() => setConfirmDialog({
-                          open: true,
-                          userId: user.user_id,
-                          action: user.is_active ? 'deactivate' : 'activate',
-                          userName: user.email,
-                        })}
-                      >
-                        {user.is_active ? (
-                          <>
-                            <UserX className="h-3 w-3 mr-1" />
-                            Deactivate
-                          </>
-                        ) : (
-                          <>
-                            <User className="h-3 w-3 mr-1" />
-                            Activate
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </TableCell>
+                            })}
+                          >
+                            {user.is_active ? (
+                              <>
+                                <UserX className="h-3 w-3 mr-1" />
+                                Deactivate
+                              </>
+                            ) : (
+                              <>
+                                <User className="h-3 w-3 mr-1" />
+                                Activate
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="activity" className="mt-4">
+          {/* Login Activity Table */}
+          <div className="rounded-lg border border-border bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Action</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Time</TableHead>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              </TableHeader>
+              <TableBody>
+                {loginActivity.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                      <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      No login activity recorded yet
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  loginActivity.map((activity) => (
+                    <TableRow key={activity.id}>
+                      <TableCell>
+                        {activity.action === 'login' ? (
+                          <Badge className="bg-accent/20 text-accent border-accent/30 gap-1">
+                            <LogIn className="h-3 w-3" />
+                            Login
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-muted text-muted-foreground gap-1">
+                            <LogOut className="h-3 w-3" />
+                            Logout
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-medium">{activity.email}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {format(new Date(activity.created_at), 'MMM d, yyyy HH:mm:ss')}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Confirmation Dialog */}
       <Dialog open={confirmDialog?.open || false} onOpenChange={(open) => !open && setConfirmDialog(null)}>

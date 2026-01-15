@@ -1,4 +1,4 @@
-import { Box, Settings, Bell, Search, Wallet, AlertTriangle, ExternalLink, LogIn, LogOut } from 'lucide-react';
+import { Box, Search, Wallet, AlertTriangle, ExternalLink, LogIn, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { useWeb3 } from '@/contexts/Web3Context';
@@ -26,6 +26,15 @@ export function Header({ isAuthenticated, onShowAuth }: HeaderProps) {
     `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 
   const handleSignOut = async () => {
+    // Log logout activity before signing out
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from('login_activity').insert({
+        user_id: user.id,
+        email: user.email || '',
+        action: 'logout',
+      });
+    }
     await supabase.auth.signOut();
     toast.success('Signed out');
   };
