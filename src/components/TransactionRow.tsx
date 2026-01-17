@@ -1,7 +1,7 @@
+import { memo, useState } from 'react';
 import { IoTTransaction } from '@/types/blockchain';
 import { formatDistanceToNow } from 'date-fns';
 import { ArrowRight, Copy, Check } from 'lucide-react';
-import { useState } from 'react';
 import { Button } from './ui/button';
 import { toast } from '@/hooks/use-toast';
 
@@ -9,7 +9,7 @@ interface TransactionRowProps {
   transaction: IoTTransaction;
 }
 
-export function TransactionRow({ transaction }: TransactionRowProps) {
+export const TransactionRow = memo(function TransactionRow({ transaction }: TransactionRowProps) {
   const [copied, setCopied] = useState(false);
 
   const hashToCopy = String(transaction.data?.hash || transaction.txHash || transaction.id);
@@ -60,4 +60,4 @@ export function TransactionRow({ transaction }: TransactionRowProps) {
       </Button>
     </div>
   );
-}
+});

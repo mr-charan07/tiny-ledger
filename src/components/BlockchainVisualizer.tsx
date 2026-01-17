@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Block } from '@/types/blockchain';
 import { cn } from '@/lib/utils';
 
@@ -5,7 +6,7 @@ interface BlockchainVisualizerProps {
   blocks: Block[];
 }
 
-export function BlockchainVisualizer({ blocks }: BlockchainVisualizerProps) {
+export const BlockchainVisualizer = memo(function BlockchainVisualizer({ blocks }: BlockchainVisualizerProps) {
   return (
     <div className="relative overflow-x-auto py-4">
       <div className="flex items-center gap-2 min-w-max px-4">
@@ -49,4 +50,4 @@ export function BlockchainVisualizer({ blocks }: BlockchainVisualizerProps) {
       </div>
     </div>
   );
-}
+});

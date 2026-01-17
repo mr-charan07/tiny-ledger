@@ -1,19 +1,30 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Web3Provider } from '@/contexts/Web3Context';
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
-import { Dashboard } from '@/components/Dashboard';
-import { BlocksView } from '@/components/BlocksView';
-import { NodesView } from '@/components/NodesView';
-import { DevicesView } from '@/components/DevicesView';
-import { PermissionsView } from '@/components/PermissionsView';
-import { RecordDataForm } from '@/components/RecordDataForm';
-import { VerificationView } from '@/components/VerificationView';
 import { AuthForm } from '@/components/AuthForm';
-import { AdminView } from '@/components/AdminView';
 import { useAdmin } from '@/hooks/useAdmin';
 
+// Lazy load heavy components for better initial load
+const Dashboard = lazy(() => import('@/components/Dashboard').then(m => ({ default: m.Dashboard })));
+const BlocksView = lazy(() => import('@/components/BlocksView').then(m => ({ default: m.BlocksView })));
+const NodesView = lazy(() => import('@/components/NodesView').then(m => ({ default: m.NodesView })));
+const DevicesView = lazy(() => import('@/components/DevicesView').then(m => ({ default: m.DevicesView })));
+const PermissionsView = lazy(() => import('@/components/PermissionsView').then(m => ({ default: m.PermissionsView })));
+const RecordDataForm = lazy(() => import('@/components/RecordDataForm').then(m => ({ default: m.RecordDataForm })));
+const VerificationView = lazy(() => import('@/components/VerificationView').then(m => ({ default: m.VerificationView })));
+const AdminView = lazy(() => import('@/components/AdminView').then(m => ({ default: m.AdminView })));
+
+// Loading fallback component
+const LoadingFallback = () => (
+  <div className="flex items-center justify-center min-h-[40vh]">
+    <div className="animate-pulse space-y-4 text-center">
+      <div className="h-8 w-8 mx-auto border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      <p className="text-muted-foreground">Loading...</p>
+    </div>
+  </div>
+);
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showAuth, setShowAuth] = useState(false);
@@ -37,44 +48,37 @@ const Index = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const handleShowAuth = () => {
+  const handleShowAuth = useCallback(() => {
     setShowAuth(true);
-  };
+  }, []);
 
-  const handleAuthSuccess = () => {
+  const handleAuthSuccess = useCallback(() => {
     setShowAuth(false);
-  };
+  }, []);
 
-  const renderContent = () => {
+  const handleTabChange = useCallback((tab: string) => {
+    setShowAuth(false);
+    setActiveTab(tab);
+  }, []);
+
+  const content = useMemo(() => {
     if (showAuth) {
       return <AuthForm onSuccess={handleAuthSuccess} />;
     }
 
-    switch (activeTab) {
-      case 'dashboard':
-        return <Dashboard onShowAuth={handleShowAuth} />;
-      case 'record':
-        return <RecordDataForm onShowAuth={handleShowAuth} />;
-      case 'verify':
-        return <VerificationView onShowAuth={handleShowAuth} />;
-      case 'blocks':
-        return <BlocksView onShowAuth={handleShowAuth} />;
-      case 'nodes':
-        return <NodesView onShowAuth={handleShowAuth} />;
-      case 'devices':
-        return <DevicesView onShowAuth={handleShowAuth} />;
-      case 'permissions':
-        return <PermissionsView />;
-      case 'admin':
-        return <AdminView onShowAuth={handleShowAuth} />;
-      default:
-        return (
-          <div className="flex items-center justify-center h-64 text-muted-foreground">
-            <p className="font-mono">Coming soon...</p>
-          </div>
-        );
-    }
-  };
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        {activeTab === 'dashboard' && <Dashboard onShowAuth={handleShowAuth} />}
+        {activeTab === 'record' && <RecordDataForm onShowAuth={handleShowAuth} />}
+        {activeTab === 'verify' && <VerificationView onShowAuth={handleShowAuth} />}
+        {activeTab === 'blocks' && <BlocksView onShowAuth={handleShowAuth} />}
+        {activeTab === 'nodes' && <NodesView onShowAuth={handleShowAuth} />}
+        {activeTab === 'devices' && <DevicesView onShowAuth={handleShowAuth} />}
+        {activeTab === 'permissions' && <PermissionsView />}
+        {activeTab === 'admin' && <AdminView onShowAuth={handleShowAuth} />}
+      </Suspense>
+    );
+  }, [activeTab, showAuth, handleShowAuth, handleAuthSuccess]);
 
   return (
     <Web3Provider>
@@ -86,15 +90,12 @@ const Index = () => {
         <div className="flex">
           <Sidebar 
             activeTab={activeTab} 
-            onTabChange={(tab) => {
-              setShowAuth(false);
-              setActiveTab(tab);
-            }}
+            onTabChange={handleTabChange}
             isAdmin={isAdmin}
           />
           <main className="flex-1 p-6 overflow-auto">
             <div className="max-w-7xl mx-auto">
-              {renderContent()}
+              {content}
             </div>
           </main>
         </div>
