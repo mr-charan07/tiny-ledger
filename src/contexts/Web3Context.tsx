@@ -37,8 +37,11 @@ export function Web3Provider({ children }: { children: ReactNode }) {
   const [provider, setProvider] = useState<BrowserProvider | null>(null);
   const [signer, setSigner] = useState<JsonRpcSigner | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isManuallyDisconnected, setIsManuallyDisconnected] = useState(() => {
+    return localStorage.getItem('wallet_disconnected') === 'true';
+  });
 
-  const isConnected = !!account;
+  const isConnected = !!account && !isManuallyDisconnected;
   const isCorrectNetwork = chainId === SEPOLIA_CHAIN_ID;
 
   const updateChainId = useCallback(async (newProvider: BrowserProvider) => {
@@ -70,6 +73,8 @@ export function Web3Provider({ children }: { children: ReactNode }) {
         setAccount(accounts[0]);
         setProvider(browserProvider);
         setSigner(userSigner);
+        setIsManuallyDisconnected(false);
+        localStorage.removeItem('wallet_disconnected');
         await updateChainId(browserProvider);
 
         toast.success('Wallet connected', {
@@ -98,6 +103,8 @@ export function Web3Provider({ children }: { children: ReactNode }) {
     setChainId(null);
     setProvider(null);
     setSigner(null);
+    setIsManuallyDisconnected(true);
+    localStorage.setItem('wallet_disconnected', 'true');
     toast.info('Wallet disconnected');
   }, []);
 
@@ -157,25 +164,27 @@ export function Web3Provider({ children }: { children: ReactNode }) {
     window.ethereum.on('accountsChanged', handleAccountsChanged);
     window.ethereum.on('chainChanged', handleChainChanged);
 
-    // Check if already connected
-    window.ethereum
-      .request({ method: 'eth_accounts' })
-      .then((accounts: string[]) => {
-        if (accounts.length > 0) {
-          const browserProvider = new BrowserProvider(window.ethereum);
-          setAccount(accounts[0]);
-          setProvider(browserProvider);
-          browserProvider.getSigner().then(setSigner);
-          updateChainId(browserProvider);
-        }
-      })
-      .catch(console.error);
+    // Check if already connected (only if not manually disconnected)
+    if (!isManuallyDisconnected) {
+      window.ethereum
+        .request({ method: 'eth_accounts' })
+        .then((accounts: string[]) => {
+          if (accounts.length > 0) {
+            const browserProvider = new BrowserProvider(window.ethereum);
+            setAccount(accounts[0]);
+            setProvider(browserProvider);
+            browserProvider.getSigner().then(setSigner);
+            updateChainId(browserProvider);
+          }
+        })
+        .catch(console.error);
+    }
 
     return () => {
       window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
       window.ethereum.removeListener('chainChanged', handleChainChanged);
     };
-  }, [account, provider, disconnectWallet, updateChainId]);
+  }, [account, provider, disconnectWallet, updateChainId, isManuallyDisconnected]);
 
   return (
     <Web3Context.Provider
