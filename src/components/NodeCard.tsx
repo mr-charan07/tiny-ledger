@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Node } from '@/types/blockchain';
 import { formatDistanceToNow } from 'date-fns';
 import { Server, Shield, Eye, Wifi, WifiOff, RefreshCw } from 'lucide-react';
@@ -7,7 +8,7 @@ interface NodeCardProps {
   node: Node;
 }
 
-export function NodeCard({ node }: NodeCardProps) {
+export const NodeCard = memo(function NodeCard({ node }: NodeCardProps) {
   const statusConfig = {
     active: {
       color: 'text-accent',
@@ -84,4 +85,4 @@ export function NodeCard({ node }: NodeCardProps) {
       </div>
     </div>
   );
-}
+});

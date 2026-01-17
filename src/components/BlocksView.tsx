@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { useData } from '@/hooks/useData';
 import { useWeb3 } from '@/contexts/Web3Context';
 import { BlockCard } from './BlockCard';
@@ -10,7 +11,7 @@ interface BlocksViewProps {
   onShowAuth?: () => void;
 }
 
-export function BlocksView({ onShowAuth }: BlocksViewProps) {
+export const BlocksView = memo(function BlocksView({ onShowAuth }: BlocksViewProps) {
   const { isConnected, isCorrectNetwork, connectWallet, switchToSepolia } = useWeb3();
   const { blocks, isLoading, isAuthenticated } = useData();
 
@@ -89,4 +90,4 @@ export function BlocksView({ onShowAuth }: BlocksViewProps) {
       )}
     </div>
   );
-}
+});

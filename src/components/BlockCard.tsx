@@ -1,8 +1,8 @@
+import { memo, useState } from 'react';
 import { Block } from '@/types/blockchain';
 import { formatDistanceToNow } from 'date-fns';
 import { Box, Clock, Hash, User, Copy, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
 import { Button } from './ui/button';
 import { toast } from '@/hooks/use-toast';
 
@@ -11,7 +11,7 @@ interface BlockCardProps {
   isLatest?: boolean;
 }
 
-export function BlockCard({ block, isLatest }: BlockCardProps) {
+export const BlockCard = memo(function BlockCard({ block, isLatest }: BlockCardProps) {
   const [copied, setCopied] = useState(false);
 
   const truncateHash = (hash: string) => {
@@ -95,4 +95,4 @@ export function BlockCard({ block, isLatest }: BlockCardProps) {
       </div>
     </div>
   );
-}
+});

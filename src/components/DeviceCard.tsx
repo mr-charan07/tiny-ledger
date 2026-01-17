@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { IoTDevice } from '@/types/blockchain';
 import { formatDistanceToNow } from 'date-fns';
 import { Cpu, Thermometer, Radio, Router, Shield, Eye, Edit } from 'lucide-react';
@@ -7,7 +8,7 @@ interface DeviceCardProps {
   device: IoTDevice;
 }
 
-export function DeviceCard({ device }: DeviceCardProps) {
+export const DeviceCard = memo(function DeviceCard({ device }: DeviceCardProps) {
   const typeConfig = {
     sensor: {
       icon: Thermometer,
@@ -112,4 +113,4 @@ export function DeviceCard({ device }: DeviceCardProps) {
       </div>
     </div>
   );
-}
+});

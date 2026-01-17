@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { useData } from '@/hooks/useData';
 import { useBlockchain } from '@/hooks/useBlockchain';
 import { useWeb3 } from '@/contexts/Web3Context';
@@ -15,7 +16,7 @@ interface DashboardProps {
   onShowAuth?: () => void;
 }
 
-export function Dashboard({ onShowAuth }: DashboardProps) {
+export const Dashboard = memo(function Dashboard({ onShowAuth }: DashboardProps) {
   const { isConnected, isCorrectNetwork, connectWallet, switchToSepolia } = useWeb3();
   const { isContractDeployed } = useBlockchain();
   const { stats, blocks, nodes, devices, transactions, isLoading, isAuthenticated } = useData();
@@ -252,4 +253,4 @@ export function Dashboard({ onShowAuth }: DashboardProps) {
       </div>
     </div>
   );
-}
+});
