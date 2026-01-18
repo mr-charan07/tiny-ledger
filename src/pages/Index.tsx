@@ -74,7 +74,7 @@ const Index = () => {
         {activeTab === 'blocks' && <BlocksView onShowAuth={handleShowAuth} />}
         {activeTab === 'nodes' && <NodesView onShowAuth={handleShowAuth} />}
         {activeTab === 'devices' && <DevicesView onShowAuth={handleShowAuth} />}
-        {activeTab === 'permissions' && <PermissionsView />}
+        {activeTab === 'permissions' && <PermissionsView onShowAuth={handleShowAuth} />}
         {activeTab === 'admin' && <AdminView onShowAuth={handleShowAuth} />}
       </Suspense>
     );
