@@ -9,7 +9,8 @@ import {
   FileText,
   Database,
   CheckCircle,
-  ShieldCheck
+  ShieldCheck,
+  Gauge
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -31,6 +32,7 @@ const navItems = [
 ];
 
 const adminItems = [
+  { id: 'performance', label: 'Performance', icon: Gauge },
   { id: 'admin', label: 'Admin Panel', icon: ShieldCheck },
 ];
 
