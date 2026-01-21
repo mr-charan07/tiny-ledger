@@ -77,12 +77,36 @@ export function useData() {
     if (!userId) return;
     
     setIsLoading(true);
+    const startTime = performance.now();
+    
     try {
       const [devicesRes, nodesRes, recordsRes] = await Promise.all([
         supabase.from('devices').select('*').order('created_at', { ascending: false }),
         supabase.from('nodes').select('*').order('created_at', { ascending: false }),
         supabase.from('data_records').select('*').order('created_at', { ascending: false }).limit(50),
       ]);
+
+      const fetchDuration = performance.now() - startTime;
+      
+      // Record performance metric
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const metricData: any = {
+          user_id: userId,
+          metric_type: 'api_call',
+          metric_name: 'fetchData',
+          value_ms: fetchDuration,
+          metadata: { 
+            success: !devicesRes.error && !nodesRes.error && !recordsRes.error,
+            devicesCount: devicesRes.data?.length || 0,
+            nodesCount: nodesRes.data?.length || 0,
+            recordsCount: recordsRes.data?.length || 0,
+          },
+        };
+        await supabase.from('performance_metrics').insert([metricData]);
+      } catch (e) {
+        // Silently fail metric recording
+      }
 
       if (devicesRes.error) throw devicesRes.error;
       if (nodesRes.error) throw nodesRes.error;

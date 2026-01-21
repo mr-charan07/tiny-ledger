@@ -155,6 +155,36 @@ export type Database = {
         }
         Relationships: []
       }
+      performance_metrics: {
+        Row: {
+          created_at: string
+          id: string
+          metadata: Json | null
+          metric_name: string
+          metric_type: string
+          user_id: string | null
+          value_ms: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          metric_name: string
+          metric_type: string
+          user_id?: string | null
+          value_ms: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          metric_name?: string
+          metric_type?: string
+          user_id?: string | null
+          value_ms?: number
+        }
+        Relationships: []
+      }
       user_profiles: {
         Row: {
           created_at: string
