@@ -83,7 +83,7 @@ export function useData() {
       const [devicesRes, nodesRes, recordsRes] = await Promise.all([
         supabase.from('devices').select('*').order('created_at', { ascending: false }),
         supabase.from('nodes').select('*').order('created_at', { ascending: false }),
-        supabase.from('data_records').select('*').order('created_at', { ascending: false }).limit(50),
+        supabase.from('data_records').select('*').order('created_at', { ascending: false }).limit(200),
       ]);
 
       const fetchDuration = performance.now() - startTime;
@@ -182,6 +182,7 @@ export function useData() {
       // Calculate stats
       const activeDevices = mappedDevices.filter((d) => d.status === 'online').length;
       const activeNodes = mappedNodes.filter((n) => n.status === 'active').length;
+      const verifiedTransactions = dbRecords.filter((r) => r.tx_hash !== null).length;
 
       // Calculate actual storage used based on data records
       const storageBytes = dbRecords.reduce((total, record) => {
@@ -203,12 +204,19 @@ export function useData() {
       // Convert bytes to KB (divide by 1024)
       const storageKB = storageBytes / 1024;
 
+      // Calculate average block time based on block timestamps
+      const avgBlockTime = generatedBlocks.length > 1
+        ? Math.abs(generatedBlocks[0].timestamp.getTime() - generatedBlocks[generatedBlocks.length - 1].timestamp.getTime()) / 
+          (generatedBlocks.length * 1000)
+        : 12;
+
       setStats({
         totalBlocks: dbRecords.length,
         totalTransactions: dbRecords.length,
+        verifiedTransactions,
         activeNodes,
         activeDevices,
-        avgBlockTime: 12,
+        avgBlockTime: Math.round(avgBlockTime) || 12,
         storageUsed: storageKB,
       });
     } catch (error) {

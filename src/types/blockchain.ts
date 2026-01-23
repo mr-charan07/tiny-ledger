@@ -43,6 +43,7 @@ export interface IoTDevice {
 export interface BlockchainStats {
   totalBlocks: number;
   totalTransactions: number;
+  verifiedTransactions: number;
   activeNodes: number;
   activeDevices: number;
   avgBlockTime: number;

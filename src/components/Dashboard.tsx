@@ -118,24 +118,26 @@ export const Dashboard = memo(function Dashboard({ onShowAuth }: DashboardProps)
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <StatCard
-          title="Total Records"
-          value={stats?.totalBlocks?.toLocaleString() || '0'}
+          title="Total Blocks"
+          value={blocks.length.toLocaleString()}
+          subtitle={`${stats?.totalBlocks || 0} records`}
           icon={Box}
           trend="up"
         />
         <StatCard
           title="Transactions"
           value={stats?.totalTransactions?.toLocaleString() || '0'}
+          subtitle={`${stats?.verifiedTransactions || 0} verified`}
           icon={ArrowUpDown}
           trend="up"
         />
-        {/* <StatCard
+        <StatCard
           title="Active Nodes"
           value={stats?.activeNodes || 0}
           subtitle={`of ${nodes.length} total`}
           icon={Server}
           trend="neutral"
-        /> */}
+        />
         <StatCard
           title="IoT Devices"
           value={stats?.activeDevices || 0}
