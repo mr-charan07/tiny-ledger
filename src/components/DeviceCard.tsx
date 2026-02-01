@@ -66,8 +66,8 @@ export const DeviceCard = memo(function DeviceCard({ device }: DeviceCardProps) 
           </div>
           <div>
             <p className="font-semibold text-foreground">{device.name}</p>
-            <p className="text-xs font-mono text-muted-foreground">
-              {device.id}
+            <p className="text-xs font-mono text-muted-foreground truncate max-w-[150px]" title={device.address}>
+              {device.address ? `${device.address.slice(0, 6)}...${device.address.slice(-4)}` : device.id.slice(0, 8)}
             </p>
           </div>
         </div>
