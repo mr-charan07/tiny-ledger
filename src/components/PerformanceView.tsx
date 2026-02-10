@@ -6,7 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { usePerformanceMetrics, MetricType } from '@/hooks/usePerformanceMetrics';
-import { useAdmin } from '@/hooks/useAdmin';
 import { 
   Activity, 
   Clock, 
@@ -49,7 +48,6 @@ interface PerformanceViewProps {
 }
 
 export function PerformanceView({ onShowAuth }: PerformanceViewProps) {
-  const { isAdmin, isLoading: adminLoading } = useAdmin();
   const { 
     metrics, 
     stats, 
@@ -186,34 +184,6 @@ export function PerformanceView({ onShowAuth }: PerformanceViewProps) {
     );
   }, [metrics]);
 
-  if (adminLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!isAdmin) {
-    return (
-      <Card className="border-destructive/50 bg-destructive/10">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-destructive">
-            <AlertCircle className="h-5 w-5" />
-            Access Denied
-          </CardTitle>
-          <CardDescription>
-            Performance metrics are only available to administrators.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={onShowAuth} variant="outline">
-            Sign in as Admin
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
 
   const pageLoadData = getMetricsByTime('page_load');
   const apiData = getMetricsByTime('api_call');
