@@ -6,6 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { usePerformanceMetrics, MetricType } from '@/hooks/usePerformanceMetrics';
+import { PerformanceStatCard } from './performance/PerformanceStatCard';
+import { WebVitalCard } from './performance/WebVitalCard';
+import { EmptyChartState } from './performance/EmptyChartState';
 import { 
   Activity, 
   Clock, 
@@ -19,13 +22,12 @@ import {
   Timer,
   BarChart3,
   PieChart as PieChartIcon,
-  TrendingDown,
   ArrowUp,
   ArrowDown,
+  Sparkles,
+  Signal,
 } from 'lucide-react';
 import {
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -40,8 +42,17 @@ import {
   Area,
   Legend,
   ComposedChart,
-  Scatter,
+  Line,
 } from 'recharts';
+
+const CHART_TOOLTIP_STYLE = {
+  backgroundColor: 'hsl(220, 18%, 10%)',
+  border: '1px solid hsl(220, 15%, 20%)',
+  borderRadius: '10px',
+  boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+  fontSize: '12px',
+  fontFamily: 'JetBrains Mono, monospace',
+};
 
 interface PerformanceViewProps {
   onShowAuth?: () => void;
@@ -117,16 +128,16 @@ export function PerformanceView({ onShowAuth }: PerformanceViewProps) {
     });
     
     const colors: Record<string, string> = {
-      page_load: 'hsl(var(--primary))',
-      api_call: 'hsl(var(--accent))',
+      page_load: 'hsl(185, 80%, 50%)',
+      api_call: 'hsl(160, 70%, 45%)',
       render: 'hsl(142, 76%, 36%)',
-      interaction: 'hsl(45, 93%, 47%)',
+      interaction: 'hsl(38, 90%, 55%)',
     };
 
     return Object.entries(types).map(([name, value]) => ({
       name: name.replace('_', ' '),
       value,
-      color: colors[name] || 'hsl(var(--muted))',
+      color: colors[name] || 'hsl(215, 15%, 55%)',
     }));
   }, [metrics]);
 
@@ -184,40 +195,16 @@ export function PerformanceView({ onShowAuth }: PerformanceViewProps) {
     );
   }, [metrics]);
 
-
   const pageLoadData = getMetricsByTime('page_load');
   const apiData = getMetricsByTime('api_call');
 
   const pieData = [
-    { name: 'Success', value: stats?.successRate || 0, color: 'hsl(142, 76%, 36%)' },
-    { name: 'Failed', value: 100 - (stats?.successRate || 0), color: 'hsl(var(--destructive))' },
+    { name: 'Success', value: stats?.successRate || 0, color: 'hsl(160, 70%, 45%)' },
+    { name: 'Failed', value: 100 - (stats?.successRate || 0), color: 'hsl(0, 70%, 55%)' },
   ].filter(d => d.value > 0);
 
-  const getWebVitalStatus = (metric: string, value: number | null) => {
-    if (value === null) return 'unknown';
-    switch (metric) {
-      case 'lcp':
-        return value <= 2500 ? 'good' : value <= 4000 ? 'needs-improvement' : 'poor';
-      case 'fid':
-        return value <= 100 ? 'good' : value <= 300 ? 'needs-improvement' : 'poor';
-      case 'cls':
-        return value <= 0.1 ? 'good' : value <= 0.25 ? 'needs-improvement' : 'poor';
-      default:
-        return 'unknown';
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'good': return 'bg-green-500 text-white';
-      case 'needs-improvement': return 'bg-yellow-500 text-white';
-      case 'poor': return 'bg-destructive text-destructive-foreground';
-      default: return 'bg-muted text-muted-foreground';
-    }
-  };
-
   const getTrend = (current: number, target: number) => {
-    if (current <= target) return { icon: ArrowDown, color: 'text-green-500', label: 'Good' };
+    if (current <= target) return { icon: ArrowDown, color: 'text-accent', label: 'Good' };
     return { icon: ArrowUp, color: 'text-destructive', label: 'Above target' };
   };
 
@@ -225,21 +212,35 @@ export function PerformanceView({ onShowAuth }: PerformanceViewProps) {
   const apiTrend = getTrend(stats?.avgApiResponse || 0, 200);
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 animate-slide-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Activity className="h-6 w-6 text-primary" />
-            Performance Metrics
-          </h1>
-          <p className="text-muted-foreground">
-            {metrics.length.toLocaleString()} events tracked • Last updated: {new Date().toLocaleTimeString()}
-          </p>
+        <div className="flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 glow-primary">
+            <Activity className="h-6 w-6 text-primary text-glow-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+              Performance Metrics
+              <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+            </h1>
+            <div className="flex items-center gap-3 mt-1">
+              <div className="flex items-center gap-1.5">
+                <Signal className="h-3 w-3 text-accent" />
+                <span className="text-xs font-mono text-muted-foreground">
+                  {metrics.length.toLocaleString()} events
+                </span>
+              </div>
+              <span className="text-muted-foreground/30">•</span>
+              <span className="text-xs font-mono text-muted-foreground">
+                {new Date().toLocaleTimeString()}
+              </span>
+            </div>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-32">
+            <SelectTrigger className="w-32 font-mono text-xs bg-secondary border-border">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -253,13 +254,15 @@ export function PerformanceView({ onShowAuth }: PerformanceViewProps) {
             size="icon"
             onClick={() => fetchMetrics(parseInt(timeRange))}
             disabled={isLoading}
+            className="border-border hover:border-primary/50 hover:glow-primary transition-all"
           >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin text-primary' : ''}`} />
           </Button>
           <Button 
-            variant="destructive" 
+            variant="outline" 
             size="sm"
             onClick={() => cleanupMetrics(30)}
+            className="border-destructive/30 text-destructive hover:bg-destructive/10"
           >
             <Trash2 className="h-4 w-4 mr-1" />
             Cleanup
@@ -269,171 +272,125 @@ export function PerformanceView({ onShowAuth }: PerformanceViewProps) {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-primary" />
-                Avg Page Load
-              </span>
-              <pageLoadTrend.icon className={`h-4 w-4 ${pageLoadTrend.color}`} />
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-primary">
-              {stats?.avgPageLoad.toFixed(0) || 0}
-              <span className="text-lg font-normal ml-1">ms</span>
-            </div>
-            <div className="flex items-center justify-between mt-2">
-              <p className="text-xs text-muted-foreground">Target: &lt; 3000ms</p>
-              <Badge variant="outline" className={pageLoadTrend.color}>
-                {pageLoadTrend.label}
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-accent/10 to-accent/5 border-accent/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <Zap className="h-4 w-4 text-accent" />
-                Avg API Response
-              </span>
-              <apiTrend.icon className={`h-4 w-4 ${apiTrend.color}`} />
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-accent">
-              {stats?.avgApiResponse.toFixed(0) || 0}
-              <span className="text-lg font-normal ml-1">ms</span>
-            </div>
-            <div className="flex items-center justify-between mt-2">
-              <p className="text-xs text-muted-foreground">P95: {stats?.p95ApiResponse.toFixed(0) || 0}ms</p>
-              <Badge variant="outline" className={apiTrend.color}>
-                {apiTrend.label}
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Gauge className="h-4 w-4 text-green-500" />
-              Success Rate
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-500">
-              {stats?.successRate.toFixed(1) || 100}
-              <span className="text-lg font-normal ml-1">%</span>
-            </div>
-            <div className="flex items-center justify-between mt-2">
-              <p className="text-xs text-muted-foreground">{stats?.totalEvents || 0} total events</p>
-              <Badge variant="outline" className={stats?.successRate && stats.successRate >= 95 ? 'text-green-500' : 'text-destructive'}>
-                {stats?.successRate && stats.successRate >= 95 ? 'Healthy' : 'Attention'}
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 border-yellow-500/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Timer className="h-4 w-4 text-yellow-500" />
-              Avg Render Time
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-yellow-500">
-              {stats?.avgRenderTime.toFixed(0) || 0}
-              <span className="text-lg font-normal ml-1">ms</span>
-            </div>
-            <div className="flex items-center justify-between mt-2">
-              <p className="text-xs text-muted-foreground">Component renders</p>
-              <Badge variant="outline" className={stats?.avgRenderTime && stats.avgRenderTime <= 16 ? 'text-green-500' : 'text-yellow-500'}>
-                {stats?.avgRenderTime && stats.avgRenderTime <= 16 ? '60fps' : 'Optimize'}
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
+        <PerformanceStatCard
+          title="Avg Page Load"
+          value={stats?.avgPageLoad.toFixed(0) || '0'}
+          unit="ms"
+          subtitle="Target: < 3000ms"
+          icon={Clock}
+          trendIcon={pageLoadTrend.icon}
+          trendColor={pageLoadTrend.color}
+          trendLabel={pageLoadTrend.label}
+          accentClass="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/20"
+          glowClass="hover:glow-primary"
+        />
+        <PerformanceStatCard
+          title="Avg API Response"
+          value={stats?.avgApiResponse.toFixed(0) || '0'}
+          unit="ms"
+          subtitle={`P95: ${stats?.p95ApiResponse.toFixed(0) || '0'}ms`}
+          icon={Zap}
+          trendIcon={apiTrend.icon}
+          trendColor={apiTrend.color}
+          trendLabel={apiTrend.label}
+          accentClass="bg-gradient-to-br from-accent/10 via-accent/5 to-transparent border-accent/20"
+          glowClass="hover:glow-accent"
+        />
+        <PerformanceStatCard
+          title="Success Rate"
+          value={stats?.successRate.toFixed(1) || '100'}
+          unit="%"
+          subtitle={`${stats?.totalEvents || 0} total events`}
+          icon={Gauge}
+          trendIcon={stats?.successRate && stats.successRate >= 95 ? CheckCircle : AlertCircle}
+          trendColor={stats?.successRate && stats.successRate >= 95 ? 'text-accent' : 'text-destructive'}
+          trendLabel={stats?.successRate && stats.successRate >= 95 ? 'Healthy' : 'Attention'}
+          accentClass="bg-gradient-to-br from-accent/10 via-accent/5 to-transparent border-accent/20"
+          glowClass="hover:glow-accent"
+        />
+        <PerformanceStatCard
+          title="Avg Render Time"
+          value={stats?.avgRenderTime.toFixed(0) || '0'}
+          unit="ms"
+          subtitle="Component renders"
+          icon={Timer}
+          trendIcon={stats?.avgRenderTime && stats.avgRenderTime <= 16 ? ArrowDown : ArrowUp}
+          trendColor={stats?.avgRenderTime && stats.avgRenderTime <= 16 ? 'text-accent' : 'text-warning'}
+          trendLabel={stats?.avgRenderTime && stats.avgRenderTime <= 16 ? '60fps' : 'Optimize'}
+          accentClass="bg-gradient-to-br from-warning/10 via-warning/5 to-transparent border-warning/20"
+          glowClass="hover:glow-warning"
+        />
       </div>
 
       {/* Web Vitals */}
-      <Card>
+      <Card className="border-primary/10 bg-gradient-to-br from-card via-card to-primary/5">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-primary" />
-            Core Web Vitals
-          </CardTitle>
-          <CardDescription>Real-time browser performance metrics (Google ranking factors)</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                Core Web Vitals
+              </CardTitle>
+              <CardDescription className="font-mono text-xs mt-1">
+                Real-time browser performance • Google ranking factors
+              </CardDescription>
+            </div>
+            <Badge variant="outline" className="font-mono text-[10px] tracking-wider border-primary/30 text-primary">
+              LIVE
+            </Badge>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-lg bg-gradient-to-br from-muted/50 to-muted/30 border">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium">LCP</span>
-                <Badge className={getStatusColor(getWebVitalStatus('lcp', webVitals.lcp))}>
-                  {getWebVitalStatus('lcp', webVitals.lcp)}
-                </Badge>
-              </div>
-              <div className="text-2xl font-bold">
-                {webVitals.lcp ? `${webVitals.lcp.toFixed(0)} ms` : 'Measuring...'}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">Largest Contentful Paint • Good: ≤2500ms</p>
-            </div>
-
-            <div className="p-4 rounded-lg bg-gradient-to-br from-muted/50 to-muted/30 border">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium">FID</span>
-                <Badge className={getStatusColor(getWebVitalStatus('fid', webVitals.fid))}>
-                  {getWebVitalStatus('fid', webVitals.fid)}
-                </Badge>
-              </div>
-              <div className="text-2xl font-bold">
-                {webVitals.fid ? `${webVitals.fid.toFixed(0)} ms` : 'Awaiting input...'}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">First Input Delay • Good: ≤100ms</p>
-            </div>
-
-            <div className="p-4 rounded-lg bg-gradient-to-br from-muted/50 to-muted/30 border">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium">CLS</span>
-                <Badge className={getStatusColor(getWebVitalStatus('cls', webVitals.cls))}>
-                  {getWebVitalStatus('cls', webVitals.cls)}
-                </Badge>
-              </div>
-              <div className="text-2xl font-bold">
-                {webVitals.cls !== null ? webVitals.cls.toFixed(3) : 'Measuring...'}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">Cumulative Layout Shift • Good: ≤0.1</p>
-            </div>
+            <WebVitalCard
+              name="LCP"
+              fullName="Largest Contentful Paint"
+              value={webVitals.lcp}
+              unit="ms"
+              thresholds={{ good: 2500, needsImprovement: 4000 }}
+              placeholder="Measuring..."
+            />
+            <WebVitalCard
+              name="FID"
+              fullName="First Input Delay"
+              value={webVitals.fid}
+              unit="ms"
+              thresholds={{ good: 100, needsImprovement: 300 }}
+              placeholder="Awaiting input..."
+            />
+            <WebVitalCard
+              name="CLS"
+              fullName="Cumulative Layout Shift"
+              value={webVitals.cls}
+              unit=""
+              thresholds={{ good: 0.1, needsImprovement: 0.25 }}
+              placeholder="Measuring..."
+            />
           </div>
         </CardContent>
       </Card>
 
       {/* Charts */}
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="trends">Trends</TabsTrigger>
-          <TabsTrigger value="api">API Analysis</TabsTrigger>
-          <TabsTrigger value="distribution">Distribution</TabsTrigger>
-          <TabsTrigger value="details">Details</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-5 bg-secondary/50 border border-border">
+          <TabsTrigger value="overview" className="font-mono text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary">Overview</TabsTrigger>
+          <TabsTrigger value="trends" className="font-mono text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary">Trends</TabsTrigger>
+          <TabsTrigger value="api" className="font-mono text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary">API Analysis</TabsTrigger>
+          <TabsTrigger value="distribution" className="font-mono text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary">Distribution</TabsTrigger>
+          <TabsTrigger value="details" className="font-mono text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary">Details</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Combined Timeline */}
-            <Card className="lg:col-span-2">
+            <Card className="lg:col-span-2 border-border/50">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <TrendingUp className="h-4 w-4 text-primary" />
                   Performance Timeline
                 </CardTitle>
-                <CardDescription>All metric types over time</CardDescription>
+                <CardDescription className="font-mono text-xs">All metric types over time</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-72">
@@ -442,148 +399,93 @@ export function PerformanceView({ onShowAuth }: PerformanceViewProps) {
                       <AreaChart data={timelineData}>
                         <defs>
                           <linearGradient id="pageLoadGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                            <stop offset="5%" stopColor="hsl(185, 80%, 50%)" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="hsl(185, 80%, 50%)" stopOpacity={0}/>
                           </linearGradient>
                           <linearGradient id="apiGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/>
+                            <stop offset="5%" stopColor="hsl(160, 70%, 45%)" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="hsl(160, 70%, 45%)" stopOpacity={0}/>
                           </linearGradient>
                           <linearGradient id="renderGradient" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="hsl(142, 76%, 36%)" stopOpacity={0.3}/>
                             <stop offset="95%" stopColor="hsl(142, 76%, 36%)" stopOpacity={0}/>
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                        <XAxis dataKey="time" className="text-xs" tick={{ fontSize: 11 }} />
-                        <YAxis className="text-xs" tick={{ fontSize: 11 }} />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: 'hsl(var(--card))', 
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px',
-                          }} 
-                          formatter={(value: number) => [`${value.toFixed(0)} ms`]}
-                        />
-                        <Legend />
-                        <Area 
-                          type="monotone" 
-                          dataKey="pageLoad" 
-                          name="Page Load"
-                          stroke="hsl(var(--primary))" 
-                          fill="url(#pageLoadGradient)"
-                          strokeWidth={2}
-                        />
-                        <Area 
-                          type="monotone" 
-                          dataKey="api" 
-                          name="API Call"
-                          stroke="hsl(var(--accent))" 
-                          fill="url(#apiGradient)"
-                          strokeWidth={2}
-                        />
-                        <Area 
-                          type="monotone" 
-                          dataKey="render" 
-                          name="Render"
-                          stroke="hsl(142, 76%, 36%)" 
-                          fill="url(#renderGradient)"
-                          strokeWidth={2}
-                        />
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 15%, 20%)" strokeOpacity={0.5} />
+                        <XAxis dataKey="time" tick={{ fontSize: 10, fontFamily: 'JetBrains Mono', fill: 'hsl(215, 15%, 55%)' }} />
+                        <YAxis tick={{ fontSize: 10, fontFamily: 'JetBrains Mono', fill: 'hsl(215, 15%, 55%)' }} />
+                        <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(value: number) => [`${value.toFixed(0)} ms`]} />
+                        <Legend wrapperStyle={{ fontFamily: 'JetBrains Mono', fontSize: '11px' }} />
+                        <Area type="monotone" dataKey="pageLoad" name="Page Load" stroke="hsl(185, 80%, 50%)" fill="url(#pageLoadGradient)" strokeWidth={2} />
+                        <Area type="monotone" dataKey="api" name="API Call" stroke="hsl(160, 70%, 45%)" fill="url(#apiGradient)" strokeWidth={2} />
+                        <Area type="monotone" dataKey="render" name="Render" stroke="hsl(142, 76%, 36%)" fill="url(#renderGradient)" strokeWidth={2} />
                       </AreaChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
-                      No timeline data available
-                    </div>
+                    <EmptyChartState message="No timeline data available" />
                   )}
                 </div>
               </CardContent>
             </Card>
 
             {/* Metric Type Distribution */}
-            <Card>
+            <Card className="border-border/50">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <PieChartIcon className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <PieChartIcon className="h-4 w-4 text-primary" />
                   Metric Distribution
                 </CardTitle>
-                <CardDescription>Events by type</CardDescription>
+                <CardDescription className="font-mono text-xs">Events by type</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-64">
                   {typeDistribution.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie
-                          data={typeDistribution}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={50}
-                          outerRadius={80}
-                          paddingAngle={3}
-                          dataKey="value"
-                          label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                          labelLine={false}
+                        <Pie data={typeDistribution} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value"
+                          label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`} labelLine={false}
                         >
                           {typeDistribution.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.color} />
                           ))}
                         </Pie>
-                        <Tooltip 
-                          formatter={(value: number) => [value.toLocaleString(), 'Events']}
-                          contentStyle={{ 
-                            backgroundColor: 'hsl(var(--card))', 
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px',
-                          }}
-                        />
+                        <Tooltip formatter={(value: number) => [value.toLocaleString(), 'Events']} contentStyle={CHART_TOOLTIP_STYLE} />
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
-                      No distribution data
-                    </div>
+                    <EmptyChartState message="No distribution data" />
                   )}
                 </div>
               </CardContent>
             </Card>
 
             {/* Success Rate Over Time */}
-            <Card>
+            <Card className="border-border/50">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="h-4 w-4 text-accent" />
                   Success Rate Trend
                 </CardTitle>
-                <CardDescription>API success rate over time</CardDescription>
+                <CardDescription className="font-mono text-xs">API success rate over time</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-64">
                   {successRateData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <ComposedChart data={successRateData}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                        <XAxis dataKey="time" className="text-xs" tick={{ fontSize: 11 }} />
-                        <YAxis yAxisId="left" className="text-xs" tick={{ fontSize: 11 }} />
-                        <YAxis yAxisId="right" orientation="right" domain={[0, 100]} className="text-xs" tick={{ fontSize: 11 }} />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: 'hsl(var(--card))', 
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px',
-                          }}
-                        />
-                        <Legend />
-                        <Bar yAxisId="left" dataKey="success" name="Success" fill="hsl(142, 76%, 36%)" radius={[4, 4, 0, 0]} />
-                        <Bar yAxisId="left" dataKey="failed" name="Failed" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
-                        <Line yAxisId="right" type="monotone" dataKey="rate" name="Success %" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 15%, 20%)" strokeOpacity={0.5} />
+                        <XAxis dataKey="time" tick={{ fontSize: 10, fontFamily: 'JetBrains Mono', fill: 'hsl(215, 15%, 55%)' }} />
+                        <YAxis yAxisId="left" tick={{ fontSize: 10, fontFamily: 'JetBrains Mono', fill: 'hsl(215, 15%, 55%)' }} />
+                        <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10, fontFamily: 'JetBrains Mono', fill: 'hsl(215, 15%, 55%)' }} />
+                        <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
+                        <Legend wrapperStyle={{ fontFamily: 'JetBrains Mono', fontSize: '11px' }} />
+                        <Bar yAxisId="left" dataKey="success" name="Success" fill="hsl(160, 70%, 45%)" radius={[4, 4, 0, 0]} />
+                        <Bar yAxisId="left" dataKey="failed" name="Failed" fill="hsl(0, 70%, 55%)" radius={[4, 4, 0, 0]} />
+                        <Line yAxisId="right" type="monotone" dataKey="rate" name="Success %" stroke="hsl(185, 80%, 50%)" strokeWidth={2} dot={false} />
                       </ComposedChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
-                      No success rate data
-                    </div>
+                    <EmptyChartState message="No success rate data" />
                   )}
                 </div>
               </CardContent>
@@ -594,10 +496,10 @@ export function PerformanceView({ onShowAuth }: PerformanceViewProps) {
         {/* Trends Tab */}
         <TabsContent value="trends" className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card>
+            <Card className="border-border/50">
               <CardHeader>
-                <CardTitle>Page Load Times</CardTitle>
-                <CardDescription>Average page load time trend</CardDescription>
+                <CardTitle className="text-sm">Page Load Times</CardTitle>
+                <CardDescription className="font-mono text-xs">Average page load time trend</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-72">
@@ -606,43 +508,28 @@ export function PerformanceView({ onShowAuth }: PerformanceViewProps) {
                       <AreaChart data={pageLoadData}>
                         <defs>
                           <linearGradient id="pageLoadFill" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4}/>
-                            <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.05}/>
+                            <stop offset="5%" stopColor="hsl(185, 80%, 50%)" stopOpacity={0.4}/>
+                            <stop offset="95%" stopColor="hsl(185, 80%, 50%)" stopOpacity={0.05}/>
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                        <XAxis dataKey="time" className="text-xs" tick={{ fontSize: 11 }} />
-                        <YAxis className="text-xs" tick={{ fontSize: 11 }} />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: 'hsl(var(--card))', 
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px',
-                          }} 
-                          formatter={(value: number) => [`${value.toFixed(0)} ms`, 'Avg Load Time']}
-                        />
-                        <Area 
-                          type="monotone" 
-                          dataKey="avg" 
-                          stroke="hsl(var(--primary))" 
-                          fill="url(#pageLoadFill)"
-                          strokeWidth={2}
-                        />
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 15%, 20%)" strokeOpacity={0.5} />
+                        <XAxis dataKey="time" tick={{ fontSize: 10, fontFamily: 'JetBrains Mono', fill: 'hsl(215, 15%, 55%)' }} />
+                        <YAxis tick={{ fontSize: 10, fontFamily: 'JetBrains Mono', fill: 'hsl(215, 15%, 55%)' }} />
+                        <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(value: number) => [`${value.toFixed(0)} ms`, 'Avg Load Time']} />
+                        <Area type="monotone" dataKey="avg" stroke="hsl(185, 80%, 50%)" fill="url(#pageLoadFill)" strokeWidth={2} />
                       </AreaChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
-                      No page load data available
-                    </div>
+                    <EmptyChartState message="No page load data available" />
                   )}
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-border/50">
               <CardHeader>
-                <CardTitle>API Response Times</CardTitle>
-                <CardDescription>Average API response time trend</CardDescription>
+                <CardTitle className="text-sm">API Response Times</CardTitle>
+                <CardDescription className="font-mono text-xs">Average API response time trend</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-72">
@@ -651,34 +538,19 @@ export function PerformanceView({ onShowAuth }: PerformanceViewProps) {
                       <AreaChart data={apiData}>
                         <defs>
                           <linearGradient id="apiFill" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.4}/>
-                            <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0.05}/>
+                            <stop offset="5%" stopColor="hsl(160, 70%, 45%)" stopOpacity={0.4}/>
+                            <stop offset="95%" stopColor="hsl(160, 70%, 45%)" stopOpacity={0.05}/>
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                        <XAxis dataKey="time" className="text-xs" tick={{ fontSize: 11 }} />
-                        <YAxis className="text-xs" tick={{ fontSize: 11 }} />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: 'hsl(var(--card))', 
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px',
-                          }} 
-                          formatter={(value: number) => [`${value.toFixed(0)} ms`, 'Avg Response']}
-                        />
-                        <Area 
-                          type="monotone" 
-                          dataKey="avg" 
-                          stroke="hsl(var(--accent))" 
-                          fill="url(#apiFill)"
-                          strokeWidth={2}
-                        />
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 15%, 20%)" strokeOpacity={0.5} />
+                        <XAxis dataKey="time" tick={{ fontSize: 10, fontFamily: 'JetBrains Mono', fill: 'hsl(215, 15%, 55%)' }} />
+                        <YAxis tick={{ fontSize: 10, fontFamily: 'JetBrains Mono', fill: 'hsl(215, 15%, 55%)' }} />
+                        <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(value: number) => [`${value.toFixed(0)} ms`, 'Avg Response']} />
+                        <Area type="monotone" dataKey="avg" stroke="hsl(160, 70%, 45%)" fill="url(#apiFill)" strokeWidth={2} />
                       </AreaChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
-                      No API data available
-                    </div>
+                    <EmptyChartState message="No API data available" />
                   )}
                 </div>
               </CardContent>
@@ -689,85 +561,59 @@ export function PerformanceView({ onShowAuth }: PerformanceViewProps) {
         {/* API Analysis Tab */}
         <TabsContent value="api" className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card>
+            <Card className="border-border/50">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <BarChart3 className="h-4 w-4 text-primary" />
                   Endpoint Performance
                 </CardTitle>
-                <CardDescription>Average and P95 response times by endpoint</CardDescription>
+                <CardDescription className="font-mono text-xs">Average and P95 response times by endpoint</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-80">
                   {endpointData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={endpointData} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                        <XAxis type="number" className="text-xs" tick={{ fontSize: 11 }} />
-                        <YAxis dataKey="name" type="category" width={100} className="text-xs" tick={{ fontSize: 11 }} />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: 'hsl(var(--card))', 
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px',
-                          }}
-                          formatter={(value: number) => [`${value.toFixed(0)} ms`]}
-                        />
-                        <Legend />
-                        <Bar dataKey="avg" name="Average" fill="hsl(var(--accent))" radius={[0, 4, 4, 0]} />
-                        <Bar dataKey="p95" name="P95" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 15%, 20%)" strokeOpacity={0.5} />
+                        <XAxis type="number" tick={{ fontSize: 10, fontFamily: 'JetBrains Mono', fill: 'hsl(215, 15%, 55%)' }} />
+                        <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 10, fontFamily: 'JetBrains Mono', fill: 'hsl(215, 15%, 55%)' }} />
+                        <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(value: number) => [`${value.toFixed(0)} ms`]} />
+                        <Legend wrapperStyle={{ fontFamily: 'JetBrains Mono', fontSize: '11px' }} />
+                        <Bar dataKey="avg" name="Average" fill="hsl(160, 70%, 45%)" radius={[0, 4, 4, 0]} />
+                        <Bar dataKey="p95" name="P95" fill="hsl(185, 80%, 50%)" radius={[0, 4, 4, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
-                      No endpoint data available
-                    </div>
+                    <EmptyChartState message="No endpoint data available" />
                   )}
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-border/50">
               <CardHeader>
-                <CardTitle>Success Rate</CardTitle>
-                <CardDescription>API call success vs failure ratio</CardDescription>
+                <CardTitle className="text-sm">Success Rate</CardTitle>
+                <CardDescription className="font-mono text-xs">API call success vs failure ratio</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-80 flex items-center justify-center">
                   {pieData.length > 0 && stats?.totalEvents ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie
-                          data={pieData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={70}
-                          outerRadius={100}
-                          paddingAngle={5}
-                          dataKey="value"
-                        >
+                        <Pie data={pieData} cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={5} dataKey="value">
                           {pieData.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.color} />
                           ))}
                         </Pie>
-                        <Tooltip 
-                          formatter={(value: number) => [`${value.toFixed(1)}%`]}
-                          contentStyle={{ 
-                            backgroundColor: 'hsl(var(--card))', 
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px',
-                          }}
-                        />
-                        <Legend />
-                        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="text-2xl font-bold fill-foreground">
+                        <Tooltip formatter={(value: number) => [`${value.toFixed(1)}%`]} contentStyle={CHART_TOOLTIP_STYLE} />
+                        <Legend wrapperStyle={{ fontFamily: 'JetBrains Mono', fontSize: '11px' }} />
+                        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" style={{ fontSize: '24px', fontWeight: 'bold', fontFamily: 'JetBrains Mono', fill: 'hsl(210, 20%, 95%)' }}>
                           {stats.successRate.toFixed(0)}%
                         </text>
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
-                      No success rate data available
-                    </div>
+                    <EmptyChartState message="No success rate data available" />
                   )}
                 </div>
               </CardContent>
@@ -778,39 +624,28 @@ export function PerformanceView({ onShowAuth }: PerformanceViewProps) {
         {/* Distribution Tab */}
         <TabsContent value="distribution" className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card>
+            <Card className="border-border/50">
               <CardHeader>
-                <CardTitle>Response Time Distribution</CardTitle>
-                <CardDescription>Histogram of API response times</CardDescription>
+                <CardTitle className="text-sm">Response Time Distribution</CardTitle>
+                <CardDescription className="font-mono text-xs">Histogram of API response times</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-72">
                   {distributionData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={distributionData}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                        <XAxis dataKey="range" className="text-xs" tick={{ fontSize: 11 }} />
-                        <YAxis className="text-xs" tick={{ fontSize: 11 }} />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: 'hsl(var(--card))', 
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px',
-                          }}
-                          formatter={(value: number) => [value.toLocaleString(), 'Requests']}
-                        />
-                        <Bar 
-                          dataKey="count" 
-                          fill="hsl(var(--primary))" 
-                          radius={[4, 4, 0, 0]}
-                        >
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 15%, 20%)" strokeOpacity={0.5} />
+                        <XAxis dataKey="range" tick={{ fontSize: 10, fontFamily: 'JetBrains Mono', fill: 'hsl(215, 15%, 55%)' }} />
+                        <YAxis tick={{ fontSize: 10, fontFamily: 'JetBrains Mono', fill: 'hsl(215, 15%, 55%)' }} />
+                        <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(value: number) => [value.toLocaleString(), 'Requests']} />
+                        <Bar dataKey="count" fill="hsl(185, 80%, 50%)" radius={[4, 4, 0, 0]}>
                           {distributionData.map((entry, index) => (
                             <Cell 
                               key={`cell-${index}`} 
                               fill={
-                                entry.max <= 100 ? 'hsl(142, 76%, 36%)' :
-                                entry.max <= 500 ? 'hsl(45, 93%, 47%)' :
-                                'hsl(var(--destructive))'
+                                entry.max <= 100 ? 'hsl(160, 70%, 45%)' :
+                                entry.max <= 500 ? 'hsl(38, 90%, 55%)' :
+                                'hsl(0, 70%, 55%)'
                               } 
                             />
                           ))}
@@ -818,46 +653,31 @@ export function PerformanceView({ onShowAuth }: PerformanceViewProps) {
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
-                      No distribution data available
-                    </div>
+                    <EmptyChartState message="No distribution data available" />
                   )}
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-border/50">
               <CardHeader>
-                <CardTitle>Call Volume by Endpoint</CardTitle>
-                <CardDescription>Number of calls per endpoint</CardDescription>
+                <CardTitle className="text-sm">Call Volume by Endpoint</CardTitle>
+                <CardDescription className="font-mono text-xs">Number of calls per endpoint</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-72">
                   {endpointData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={endpointData}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                        <XAxis dataKey="name" className="text-xs" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
-                        <YAxis className="text-xs" tick={{ fontSize: 11 }} />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: 'hsl(var(--card))', 
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px',
-                          }}
-                          formatter={(value: number) => [value.toLocaleString(), 'Calls']}
-                        />
-                        <Bar 
-                          dataKey="count" 
-                          fill="hsl(var(--accent))" 
-                          radius={[4, 4, 0, 0]}
-                        />
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 15%, 20%)" strokeOpacity={0.5} />
+                        <XAxis dataKey="name" tick={{ fontSize: 9, fontFamily: 'JetBrains Mono', fill: 'hsl(215, 15%, 55%)' }} angle={-45} textAnchor="end" height={60} />
+                        <YAxis tick={{ fontSize: 10, fontFamily: 'JetBrains Mono', fill: 'hsl(215, 15%, 55%)' }} />
+                        <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(value: number) => [value.toLocaleString(), 'Calls']} />
+                        <Bar dataKey="count" fill="hsl(160, 70%, 45%)" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
-                      No call volume data
-                    </div>
+                    <EmptyChartState message="No call volume data" />
                   )}
                 </div>
               </CardContent>
@@ -867,15 +687,15 @@ export function PerformanceView({ onShowAuth }: PerformanceViewProps) {
 
         {/* Details Tab */}
         <TabsContent value="details">
-          <Card>
+          <Card className="border-border/50">
             <CardHeader>
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                  <CardTitle>Metric Details</CardTitle>
-                  <CardDescription>Recent performance events (showing latest 50)</CardDescription>
+                  <CardTitle className="text-sm">Metric Details</CardTitle>
+                  <CardDescription className="font-mono text-xs">Recent performance events (showing latest 50)</CardDescription>
                 </div>
                 <Select value={selectedType} onValueChange={setSelectedType}>
-                  <SelectTrigger className="w-40">
+                  <SelectTrigger className="w-40 font-mono text-xs bg-secondary border-border">
                     <SelectValue placeholder="Filter by type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -892,35 +712,35 @@ export function PerformanceView({ onShowAuth }: PerformanceViewProps) {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead className="text-right">Duration</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
-                      <TableHead>Time</TableHead>
+                    <TableRow className="border-border/50 hover:bg-transparent">
+                      <TableHead className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Type</TableHead>
+                      <TableHead className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Name</TableHead>
+                      <TableHead className="text-right font-mono text-xs uppercase tracking-wider text-muted-foreground">Duration</TableHead>
+                      <TableHead className="text-center font-mono text-xs uppercase tracking-wider text-muted-foreground">Status</TableHead>
+                      <TableHead className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Time</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {metrics.slice(0, 50).map((metric) => (
-                      <TableRow key={metric.id}>
+                      <TableRow key={metric.id} className="border-border/30 hover:bg-primary/5 transition-colors">
                         <TableCell>
                           <Badge 
                             variant="outline"
-                            className={
-                              metric.metric_type === 'page_load' ? 'border-primary text-primary' :
-                              metric.metric_type === 'api_call' ? 'border-accent text-accent' :
-                              metric.metric_type === 'render' ? 'border-green-500 text-green-500' :
-                              'border-yellow-500 text-yellow-500'
-                            }
+                            className={`font-mono text-[10px] uppercase tracking-wider ${
+                              metric.metric_type === 'page_load' ? 'border-primary/40 text-primary bg-primary/5' :
+                              metric.metric_type === 'api_call' ? 'border-accent/40 text-accent bg-accent/5' :
+                              metric.metric_type === 'render' ? 'border-accent/40 text-accent bg-accent/5' :
+                              'border-warning/40 text-warning bg-warning/5'
+                            }`}
                           >
                             {metric.metric_type.replace('_', ' ')}
                           </Badge>
                         </TableCell>
-                        <TableCell className="font-medium">{metric.metric_name}</TableCell>
-                        <TableCell className="text-right font-mono">
+                        <TableCell className="font-mono text-xs font-medium">{metric.metric_name}</TableCell>
+                        <TableCell className="text-right font-mono text-xs">
                           <span className={
-                            metric.value_ms <= 100 ? 'text-green-500' :
-                            metric.value_ms <= 500 ? 'text-yellow-500' :
+                            metric.value_ms <= 100 ? 'text-accent' :
+                            metric.value_ms <= 500 ? 'text-warning' :
                             'text-destructive'
                           }>
                             {metric.value_ms.toFixed(0)} ms
@@ -928,14 +748,14 @@ export function PerformanceView({ onShowAuth }: PerformanceViewProps) {
                         </TableCell>
                         <TableCell className="text-center">
                           {metric.metadata?.success === true || metric.metadata?.status === 'success' ? (
-                            <CheckCircle className="h-4 w-4 text-green-500 mx-auto" />
+                            <CheckCircle className="h-4 w-4 text-accent mx-auto" />
                           ) : metric.metadata?.success === false ? (
                             <AlertCircle className="h-4 w-4 text-destructive mx-auto" />
                           ) : (
-                            <span className="text-muted-foreground">-</span>
+                            <span className="text-muted-foreground/30">—</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
+                        <TableCell className="text-muted-foreground text-xs font-mono">
                           {new Date(metric.created_at).toLocaleString()}
                         </TableCell>
                       </TableRow>
@@ -944,8 +764,12 @@ export function PerformanceView({ onShowAuth }: PerformanceViewProps) {
                 </Table>
               </div>
               {metrics.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  No metrics recorded yet
+                <div className="text-center py-12">
+                  <div className="p-4 rounded-xl bg-muted/20 border border-border inline-block mb-3">
+                    <Activity className="h-8 w-8 text-muted-foreground/40" />
+                  </div>
+                  <p className="text-sm text-muted-foreground font-mono">No metrics recorded yet</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">Metrics will appear as you use the application</p>
                 </div>
               )}
             </CardContent>
