@@ -27,12 +27,10 @@ const navItems = [
   // { id: 'nodes', label: 'Nodes', icon: Server },
   { id: 'devices', label: 'IoT Devices', icon: Cpu },
   { id: 'permissions', label: 'Permissions', icon: Shield },
-  // { id: 'analytics', label: 'Analytics', icon: Activity },
-  // { id: 'logs', label: 'Logs', icon: FileText },
+  { id: 'performance', label: 'Performance', icon: Gauge },
 ];
 
 const adminItems = [
-  { id: 'performance', label: 'Performance', icon: Gauge },
   { id: 'admin', label: 'Admin Panel', icon: ShieldCheck },
 ];
 
