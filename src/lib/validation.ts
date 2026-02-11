@@ -4,8 +4,7 @@ import { z } from 'zod';
 export const iotDataSchema = z.object({
   deviceName: z.string()
     .min(1, 'Device name is required')
-    .max(64, 'Device name must be less than 64 characters')
-    .regex(/^[a-zA-Z0-9_-]+$/, 'Device name can only contain letters, numbers, underscores and hyphens'),
+    .max(64, 'Device name must be less than 64 characters'),
   dataType: z.string()
     .min(1, 'Data type is required')
     .max(32, 'Data type must be less than 32 characters')
