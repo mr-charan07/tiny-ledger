@@ -1,272 +1,231 @@
-import { 
-  Database, Server, Shield, Cpu, Globe, Box, 
-  ArrowRight, ArrowDown, Layers, Lock, Zap, Hash,
-  Monitor, Wallet, FileCode, Users, Activity
-} from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { useRef, useEffect, useState, useCallback } from 'react';
 
 interface ArchitectureViewProps {
   onShowAuth?: () => void;
 }
 
-// ─── Reusable diagram node ───────────────────────────────────────────
-function DiagramNode({ 
-  icon: Icon, label, sublabel, color = 'primary', glow = false 
-}: { 
-  icon: React.ElementType; label: string; sublabel?: string; 
-  color?: 'primary' | 'accent' | 'warning' | 'destructive'; glow?: boolean;
-}) {
-  const colorMap = {
-    primary:     'border-primary/40 bg-primary/10 text-primary',
-    accent:      'border-accent/40 bg-accent/10 text-accent',
-    warning:     'border-warning/40 bg-warning/10 text-warning',
-    destructive: 'border-destructive/40 bg-destructive/10 text-destructive',
-  };
-  const iconColor = {
-    primary: 'text-primary', accent: 'text-accent', 
-    warning: 'text-warning', destructive: 'text-destructive',
-  };
+// ─── Color palette (matches CSS tokens) ──────────────────────────────
+const COLORS = {
+  primary:    { fill: 'hsl(185,80%,50%)', bg: 'hsla(185,80%,50%,0.12)', border: 'hsla(185,80%,50%,0.5)', text: 'hsl(185,80%,95%)' },
+  accent:     { fill: 'hsl(160,70%,45%)', bg: 'hsla(160,70%,45%,0.12)', border: 'hsla(160,70%,45%,0.5)', text: 'hsl(160,70%,95%)' },
+  warning:    { fill: 'hsl(38,90%,55%)',  bg: 'hsla(38,90%,55%,0.12)',  border: 'hsla(38,90%,55%,0.5)',  text: 'hsl(38,90%,95%)' },
+  destructive:{ fill: 'hsl(0,70%,55%)',   bg: 'hsla(0,70%,55%,0.12)',   border: 'hsla(0,70%,55%,0.5)',   text: 'hsl(0,70%,95%)' },
+  muted:      { fill: 'hsl(215,15%,55%)', bg: 'hsla(220,15%,18%,0.6)',  border: 'hsla(220,15%,20%,0.8)', text: 'hsl(210,20%,75%)' },
+  bg:         'hsl(220,20%,6%)',
+  cardBg:     'hsl(220,18%,10%)',
+  line:       'hsla(185,80%,50%,0.35)',
+  lineAccent: 'hsla(160,70%,45%,0.35)',
+  lineWarn:   'hsla(38,90%,55%,0.35)',
+  labelBg:    'hsla(220,18%,10%,0.9)',
+};
 
-  return (
-    <div className={`flex flex-col items-center gap-1.5 rounded-xl border-2 px-4 py-3 ${colorMap[color]} ${glow ? 'glow-primary' : ''} transition-all hover:scale-105`}>
-      <Icon className={`h-6 w-6 ${iconColor[color]}`} />
-      <span className="text-xs font-bold tracking-wide uppercase">{label}</span>
-      {sublabel && <span className="text-[10px] text-muted-foreground text-center leading-tight">{sublabel}</span>}
-    </div>
-  );
+// ─── Node definition ─────────────────────────────────────────────────
+interface FlowNode {
+  id: string;
+  x: number; y: number; w: number; h: number;
+  label: string; sublabel?: string;
+  color: keyof typeof COLORS & ('primary' | 'accent' | 'warning' | 'destructive');
+  shape?: 'rect' | 'rounded' | 'diamond' | 'stadium';
+  glow?: boolean;
 }
 
-function Connector({ direction = 'right', label }: { direction?: 'right' | 'down'; label?: string }) {
-  if (direction === 'down') {
-    return (
-      <div className="flex flex-col items-center gap-0.5 py-1">
-        <ArrowDown className="h-5 w-5 text-muted-foreground animate-pulse-slow" />
-        {label && <span className="text-[9px] text-muted-foreground">{label}</span>}
-      </div>
-    );
-  }
-  return (
-    <div className="flex items-center gap-0.5 px-1">
-      <ArrowRight className="h-5 w-5 text-muted-foreground animate-pulse-slow" />
-      {label && <span className="text-[9px] text-muted-foreground">{label}</span>}
-    </div>
-  );
+interface FlowEdge {
+  from: string; to: string;
+  label?: string;
+  color?: string;
+  dashed?: boolean;
 }
 
-// ─── Section wrapper ─────────────────────────────────────────────────
-function Section({ title, badge, children }: { title: string; badge?: string; children: React.ReactNode }) {
-  return (
-    <Card className="border-border/60 bg-card/80 backdrop-blur">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-3 text-base">
-          {title}
-          {badge && <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">{badge}</Badge>}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
-  );
+interface FlowGroup {
+  label: string; color: keyof typeof COLORS & ('primary' | 'accent' | 'warning' | 'muted');
+  x: number; y: number; w: number; h: number;
+}
+
+// ─── Chart data ──────────────────────────────────────────────────────
+const W = 960;
+const H = 720;
+
+const groups: FlowGroup[] = [
+  { label: 'Browser / Client',      color: 'primary', x: 20,  y: 20,  w: 920, h: 100 },
+  { label: 'Application Layer',     color: 'muted',   x: 20,  y: 170, w: 920, h: 110 },
+  { label: 'Ethereum – Sepolia',    color: 'warning', x: 20,  y: 340, w: 440, h: 200 },
+  { label: 'Lovable Cloud Backend', color: 'accent',  x: 500, y: 340, w: 440, h: 200 },
+  { label: 'Data Flows',            color: 'muted',   x: 20,  y: 580, w: 920, h: 120 },
+];
+
+const nodes: FlowNode[] = [
+  // Client
+  { id: 'ui',       x: 160,  y: 55,  w: 150, h: 50, label: 'React UI',       sublabel: 'Vite + TypeScript', color: 'primary', glow: true },
+  { id: 'mm',       x: 650,  y: 55,  w: 150, h: 50, label: 'MetaMask',       sublabel: 'Wallet Extension',  color: 'warning' },
+  // App layer
+  { id: 'w3ctx',    x: 60,   y: 210, w: 140, h: 44, label: 'Web3Context',    sublabel: 'Wallet State',      color: 'primary' },
+  { id: 'useblk',   x: 260,  y: 210, w: 150, h: 44, label: 'useBlockchain',  sublabel: 'Contract Calls',    color: 'primary' },
+  { id: 'usedata',  x: 510,  y: 210, w: 140, h: 44, label: 'useData',        sublabel: 'CRUD & Auth',       color: 'accent' },
+  { id: 'useperf',  x: 740,  y: 210, w: 160, h: 44, label: 'usePerformance', sublabel: 'Metrics',           color: 'accent' },
+  // Blockchain
+  { id: 'sc',       x: 100,  y: 385, w: 170, h: 50, label: 'IoTBlockchain.sol', sublabel: 'Smart Contract', color: 'warning' },
+  { id: 'event',    x: 100,  y: 475, w: 170, h: 50, label: 'DataRecorded',   sublabel: 'Event (id,hash)',   color: 'warning' },
+  // Backend
+  { id: 'auth',     x: 580,  y: 375, w: 140, h: 44, label: 'Auth Service',   sublabel: 'Email / Password',  color: 'accent' },
+  { id: 'db',       x: 780,  y: 375, w: 130, h: 44, label: 'PostgreSQL',     sublabel: 'Database',          color: 'accent' },
+  { id: 'rls',      x: 680,  y: 470, w: 140, h: 44, label: 'Row Level Security', sublabel: 'Per-user isolation', color: 'accent' },
+  // Data flows
+  { id: 'record',   x: 60,   y: 620, w: 130, h: 44, label: 'Record Data',    sublabel: 'IoT → Hash → TX',   color: 'primary' },
+  { id: 'verify',   x: 250,  y: 620, w: 130, h: 44, label: 'Verify',         sublabel: 'Compare hashes',    color: 'accent' },
+  { id: 'wallet',   x: 440,  y: 620, w: 130, h: 44, label: 'Wallet Flow',    sublabel: 'Connect → Sepolia', color: 'warning' },
+  { id: 'authflow', x: 630,  y: 620, w: 130, h: 44, label: 'Auth Flow',      sublabel: 'Login → JWT',       color: 'accent' },
+  { id: 'perf',     x: 810,  y: 620, w: 120, h: 44, label: 'Perf Metrics',   sublabel: 'Collect & Chart',   color: 'primary' },
+];
+
+const edges: FlowEdge[] = [
+  { from: 'ui',      to: 'mm',      label: 'wallet',       color: COLORS.lineWarn },
+  { from: 'ui',      to: 'w3ctx',   label: 'context',      color: COLORS.line },
+  { from: 'ui',      to: 'usedata', label: 'hooks',        color: COLORS.lineAccent },
+  { from: 'w3ctx',   to: 'mm',      label: '',             color: COLORS.lineWarn, dashed: true },
+  { from: 'w3ctx',   to: 'useblk',  label: '',             color: COLORS.line },
+  { from: 'useblk',  to: 'sc',      label: 'ethers.js',    color: COLORS.lineWarn },
+  { from: 'sc',      to: 'event',   label: 'emits',        color: COLORS.lineWarn },
+  { from: 'usedata', to: 'auth',    label: 'supabase-js',  color: COLORS.lineAccent },
+  { from: 'usedata', to: 'db',      label: '',             color: COLORS.lineAccent },
+  { from: 'auth',    to: 'db',      label: '',             color: COLORS.lineAccent, dashed: true },
+  { from: 'db',      to: 'rls',     label: 'enforces',     color: COLORS.lineAccent },
+  { from: 'useperf', to: 'db',      label: 'metrics',      color: COLORS.lineAccent, dashed: true },
+];
+
+function getNodeCenter(id: string): { x: number; y: number } {
+  const n = nodes.find(n => n.id === id)!;
+  return { x: n.x + n.w / 2, y: n.y + n.h / 2 };
 }
 
 export function ArchitectureView({ onShowAuth }: ArchitectureViewProps) {
+  const [hovered, setHovered] = useState<string | null>(null);
+
   return (
-    <div className="space-y-8 animate-slide-in">
-      {/* Page heading */}
+    <div className="space-y-6 animate-slide-in">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">
           System <span className="text-primary text-glow-primary">Architecture</span>
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Hybrid IoT Blockchain platform — architecture overview &amp; data flows
+          Hybrid IoT Blockchain platform — interactive flowchart
         </p>
       </div>
 
-      {/* ── 1. High-Level Architecture ──────────────────────────────── */}
-      <Section title="High-Level Architecture" badge="Overview">
-        <div className="flex flex-col items-center gap-2">
-          {/* Client row */}
-          <div className="flex items-center gap-3 flex-wrap justify-center">
-            <DiagramNode icon={Monitor} label="React UI" sublabel="Vite + TypeScript" color="primary" glow />
-            <Connector label="wallet" />
-            <DiagramNode icon={Wallet} label="MetaMask" sublabel="Browser Extension" color="warning" />
-          </div>
+      <div className="w-full overflow-x-auto rounded-xl border border-border/50 bg-card/60 backdrop-blur p-2">
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          className="w-full min-w-[700px]"
+          style={{ maxHeight: '75vh' }}
+        >
+          <defs>
+            {/* Glow filter */}
+            <filter id="glow-f" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="6" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+            {/* Arrow markers */}
+            {['primary','accent','warning'].map(c => (
+              <marker key={c} id={`arrow-${c}`} viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill={COLORS[c as 'primary'].fill} fillOpacity="0.7" />
+              </marker>
+            ))}
+            <marker id="arrow-default" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill={COLORS.primary.fill} fillOpacity="0.5" />
+            </marker>
+          </defs>
 
-          <Connector direction="down" label="hooks & context" />
+          {/* Groups */}
+          {groups.map(g => {
+            const c = COLORS[g.color];
+            return (
+              <g key={g.label}>
+                <rect x={g.x} y={g.y} width={g.w} height={g.h} rx={12}
+                  fill={c.bg} stroke={c.border} strokeWidth={1.5} strokeDasharray="6 3" />
+                <text x={g.x + 14} y={g.y + 18} fill={c.fill} fontSize={10} fontWeight={700}
+                  letterSpacing="0.08em" textAnchor="start" style={{ textTransform: 'uppercase' }}>
+                  {g.label}
+                </text>
+              </g>
+            );
+          })}
 
-          {/* App layer row */}
-          <div className="rounded-xl border border-border/50 bg-secondary/30 p-4 w-full">
-            <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-3 text-center">Application Layer</p>
-            <div className="flex items-center gap-3 flex-wrap justify-center">
-              <DiagramNode icon={Globe} label="Web3Context" sublabel="Wallet State" color="primary" />
-              <DiagramNode icon={Zap} label="useBlockchain" sublabel="Contract Calls" color="primary" />
-              <DiagramNode icon={Database} label="useData" sublabel="CRUD & Auth" color="accent" />
-              <DiagramNode icon={Activity} label="usePerformance" sublabel="Metrics" color="accent" />
-            </div>
-          </div>
+          {/* Edges */}
+          {edges.map((e, i) => {
+            const from = getNodeCenter(e.from);
+            const to = getNodeCenter(e.to);
+            const isHighlighted = hovered === e.from || hovered === e.to;
+            const markerColor = e.color === COLORS.lineWarn ? 'warning' : e.color === COLORS.lineAccent ? 'accent' : 'primary';
 
-          <div className="flex items-center gap-12">
-            <Connector direction="down" label="ethers.js" />
-            <Connector direction="down" label="supabase-js" />
-          </div>
+            // Simple line with midpoint for label
+            const mx = (from.x + to.x) / 2;
+            const my = (from.y + to.y) / 2;
 
-          {/* Backend row */}
-          <div className="flex items-start gap-6 flex-wrap justify-center w-full">
-            {/* Blockchain */}
-            <div className="rounded-xl border border-warning/30 bg-warning/5 p-4 flex-1 min-w-[220px]">
-              <p className="text-[10px] uppercase tracking-widest text-warning mb-3 text-center">Ethereum — Sepolia Testnet</p>
-              <div className="flex flex-col items-center gap-2">
-                <DiagramNode icon={FileCode} label="IoTBlockchain.sol" sublabel="Smart Contract" color="warning" />
-                <Connector direction="down" label="emits" />
-                <DiagramNode icon={Hash} label="DataRecorded" sublabel="Event (id, sender, hash)" color="warning" />
-              </div>
-            </div>
+            return (
+              <g key={i}>
+                <line x1={from.x} y1={from.y} x2={to.x} y2={to.y}
+                  stroke={e.color || COLORS.line}
+                  strokeWidth={isHighlighted ? 2.5 : 1.5}
+                  strokeDasharray={e.dashed ? '5 4' : undefined}
+                  markerEnd={`url(#arrow-${markerColor})`}
+                  opacity={isHighlighted ? 1 : 0.6}
+                  style={{ transition: 'all 0.2s' }}
+                />
+                {e.label && (
+                  <>
+                    <rect x={mx - 28} y={my - 8} width={56} height={16} rx={4}
+                      fill={COLORS.labelBg} />
+                    <text x={mx} y={my + 4} fill={COLORS.muted.text} fontSize={8}
+                      fontWeight={600} textAnchor="middle">{e.label}</text>
+                  </>
+                )}
+              </g>
+            );
+          })}
 
-            {/* Cloud backend */}
-            <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 flex-1 min-w-[220px]">
-              <p className="text-[10px] uppercase tracking-widest text-accent mb-3 text-center">Lovable Cloud Backend</p>
-              <div className="flex flex-col items-center gap-2">
-                <DiagramNode icon={Users} label="Auth Service" sublabel="Email / Password" color="accent" />
-                <Connector direction="down" />
-                <DiagramNode icon={Database} label="PostgreSQL" sublabel="Database" color="accent" />
-                <Connector direction="down" />
-                <DiagramNode icon={Lock} label="RLS" sublabel="Per-user isolation" color="accent" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </Section>
-
-      {/* ── 2. Database Schema ─────────────────────────────────────── */}
-      <Section title="Database Schema" badge="ER Diagram">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <SchemaCard name="user_profiles" color="accent" fields={['id (PK)', 'user_id (UK)', 'email', 'display_name', 'is_active', 'last_login_at']} />
-          <SchemaCard name="user_roles" color="accent" fields={['id (PK)', 'user_id', 'role (enum)', 'created_at']} />
-          <SchemaCard name="devices" color="primary" fields={['id (PK)', 'user_id', 'address', 'name', 'device_type', 'location', 'active', 'permission_level']} />
-          <SchemaCard name="nodes" color="primary" fields={['id (PK)', 'user_id', 'address', 'name', 'active', 'is_validator']} />
-          <SchemaCard name="data_records" color="warning" fields={['id (PK)', 'user_id', 'record_id', 'device_address', 'data_hash', 'tx_hash', 'temperature', 'humidity', 'raw_data']} />
-          <SchemaCard name="performance_metrics" color="accent" fields={['id (PK)', 'user_id', 'metric_type', 'metric_name', 'value_ms', 'metadata']} />
-          <SchemaCard name="login_activity" color="destructive" fields={['id (PK)', 'user_id', 'email', 'action', 'ip_address', 'user_agent']} />
-        </div>
-
-        {/* Relationships */}
-        <div className="mt-4 p-3 rounded-lg bg-secondary/40 border border-border/40">
-          <p className="text-xs font-semibold text-foreground mb-2">Relationships</p>
-          <div className="flex flex-wrap gap-2 text-[11px]">
-            <Badge variant="outline" className="border-accent/40 text-accent">user_profiles → devices (1:N)</Badge>
-            <Badge variant="outline" className="border-accent/40 text-accent">user_profiles → nodes (1:N)</Badge>
-            <Badge variant="outline" className="border-warning/40 text-warning">user_profiles → data_records (1:N)</Badge>
-            <Badge variant="outline" className="border-primary/40 text-primary">devices → data_records (1:N)</Badge>
-            <Badge variant="outline" className="border-accent/40 text-accent">user_profiles → user_roles (1:1)</Badge>
-          </div>
-        </div>
-      </Section>
-
-      {/* ── 3. Smart Contract ──────────────────────────────────────── */}
-      <Section title="Smart Contract" badge="Solidity 0.8.28">
-        <div className="flex flex-col sm:flex-row items-center gap-4 justify-center">
-          <div className="rounded-xl border-2 border-warning/40 bg-warning/5 p-5 min-w-[200px]">
-            <p className="text-xs font-bold text-warning mb-3 text-center">IoTBlockchain</p>
-            <div className="space-y-1 text-[11px] font-mono text-muted-foreground">
-              <p><span className="text-accent">+</span> address owner</p>
-              <p><span className="text-accent">+</span> uint256 recordCount</p>
-              <p className="border-t border-border/30 pt-1"><span className="text-primary">+</span> record(bytes32 _hash) → uint256</p>
-              <p><span className="text-primary">+</span> transferOwnership(address)</p>
-              <p><span className="text-destructive">-</span> onlyOwner modifier</p>
-            </div>
-          </div>
-
-          <Connector label="emits" />
-
-          <div className="rounded-xl border-2 border-primary/40 bg-primary/5 p-5 min-w-[200px]">
-            <p className="text-xs font-bold text-primary mb-3 text-center">DataRecorded «event»</p>
-            <div className="space-y-1 text-[11px] font-mono text-muted-foreground">
-              <p><span className="text-accent">+</span> uint256 id</p>
-              <p><span className="text-accent">+</span> address sender</p>
-              <p><span className="text-accent">+</span> bytes32 dataHash</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2 text-[11px]">
-          <Badge variant="outline" className="border-warning/40 text-warning">Sepolia Testnet</Badge>
-          <Badge variant="outline" className="border-primary/40 text-primary font-mono">0x0C7e3d...0573eB</Badge>
-          <Badge variant="outline" className="border-accent/40 text-accent">Proof-only — keccak256 hashes on-chain</Badge>
-        </div>
-      </Section>
-
-      {/* ── 4. Key Flows Summary ───────────────────────────────────── */}
-      <Section title="Key Data Flows" badge="Flowcharts">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <FlowCard title="IoT Data Recording" color="primary" steps={['User fills form', 'Validate inputs (zod)', 'Generate keccak256 hash', 'MetaMask → submit tx', 'Parse DataRecorded event', 'Save to database']} />
-          <FlowCard title="Data Verification" color="accent" steps={['Enter tx hash / record ID', 'Query database', 'Fetch on-chain receipt', 'Compare hashes', '✅ Verified or ❌ Mismatch']} />
-          <FlowCard title="Wallet Connection" color="warning" steps={['Detect MetaMask', 'eth_requestAccounts', 'Verify Sepolia chain', 'Create BrowserProvider', 'Initialize contract', 'Ready']} />
-          <FlowCard title="Authentication" color="accent" steps={['Login / Sign-up form', 'Email verification', 'Session created (JWT)', 'Load user profile', 'Log activity', 'App access']} />
-        </div>
-      </Section>
-
-      {/* ── 5. Tech Stack ──────────────────────────────────────────── */}
-      <Section title="Technology Stack">
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            { layer: 'Frontend', tech: 'React 18, TypeScript, Vite, Tailwind, shadcn/ui', color: 'primary' as const },
-            { layer: 'State', tech: 'TanStack Query, React Context', color: 'primary' as const },
-            { layer: 'Blockchain', tech: 'ethers.js v6, MetaMask, Solidity 0.8.28', color: 'warning' as const },
-            { layer: 'Network', tech: 'Ethereum Sepolia Testnet', color: 'warning' as const },
-            { layer: 'Backend', tech: 'Lovable Cloud (PostgreSQL + Auth + RLS)', color: 'accent' as const },
-            { layer: 'Charts', tech: 'Recharts', color: 'accent' as const },
-          ].map((t) => (
-            <div key={t.layer} className="flex items-center gap-3 rounded-lg border border-border/40 bg-secondary/30 px-3 py-2">
-              <Badge variant="outline" className={`text-[10px] border-${t.color}/40 text-${t.color} shrink-0`}>{t.layer}</Badge>
-              <span className="text-xs text-muted-foreground">{t.tech}</span>
-            </div>
-          ))}
-        </div>
-      </Section>
-    </div>
-  );
-}
-
-// ─── Helper: Schema table card ────────────────────────────────────────
-function SchemaCard({ name, fields, color }: { name: string; fields: string[]; color: 'primary' | 'accent' | 'warning' | 'destructive' }) {
-  const borderColors = {
-    primary: 'border-primary/30', accent: 'border-accent/30', 
-    warning: 'border-warning/30', destructive: 'border-destructive/30',
-  };
-  const textColors = {
-    primary: 'text-primary', accent: 'text-accent', 
-    warning: 'text-warning', destructive: 'text-destructive',
-  };
-
-  return (
-    <div className={`rounded-lg border ${borderColors[color]} bg-secondary/20 p-3`}>
-      <div className="flex items-center gap-2 mb-2">
-        <Database className={`h-3.5 w-3.5 ${textColors[color]}`} />
-        <span className={`text-xs font-bold font-mono ${textColors[color]}`}>{name}</span>
+          {/* Nodes */}
+          {nodes.map(n => {
+            const c = COLORS[n.color];
+            const isHov = hovered === n.id;
+            return (
+              <g key={n.id}
+                onMouseEnter={() => setHovered(n.id)}
+                onMouseLeave={() => setHovered(null)}
+                style={{ cursor: 'pointer', transition: 'transform 0.2s' }}
+              >
+                <rect
+                  x={n.x} y={n.y} width={n.w} height={n.h} rx={10}
+                  fill={c.bg} stroke={c.border}
+                  strokeWidth={isHov ? 2.5 : 1.5}
+                  filter={n.glow || isHov ? 'url(#glow-f)' : undefined}
+                  style={{ transition: 'all 0.2s' }}
+                />
+                <text x={n.x + n.w / 2} y={n.y + (n.sublabel ? n.h / 2 - 4 : n.h / 2 + 4)}
+                  fill={c.fill} fontSize={11} fontWeight={700} textAnchor="middle">
+                  {n.label}
+                </text>
+                {n.sublabel && (
+                  <text x={n.x + n.w / 2} y={n.y + n.h / 2 + 12}
+                    fill={COLORS.muted.text} fontSize={9} textAnchor="middle">
+                    {n.sublabel}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
       </div>
-      <div className="space-y-0.5">
-        {fields.map((f) => (
-          <p key={f} className="text-[10px] font-mono text-muted-foreground pl-5">{f}</p>
-        ))}
-      </div>
-    </div>
-  );
-}
 
-// ─── Helper: Flow summary card ────────────────────────────────────────
-function FlowCard({ title, steps, color }: { title: string; steps: string[]; color: 'primary' | 'accent' | 'warning' }) {
-  const borderColors = { primary: 'border-primary/30', accent: 'border-accent/30', warning: 'border-warning/30' };
-  const dotColors = { primary: 'bg-primary', accent: 'bg-accent', warning: 'bg-warning' };
-  const textColors = { primary: 'text-primary', accent: 'text-accent', warning: 'text-warning' };
-
-  return (
-    <div className={`rounded-lg border ${borderColors[color]} bg-secondary/20 p-3`}>
-      <p className={`text-xs font-bold mb-2 ${textColors[color]}`}>{title}</p>
-      <div className="space-y-1.5">
-        {steps.map((s, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <div className={`h-1.5 w-1.5 rounded-full ${dotColors[color]} shrink-0`} />
-            <span className="text-[11px] text-muted-foreground">{s}</span>
+      {/* Legend */}
+      <div className="flex flex-wrap gap-4 text-[11px] px-1">
+        {[
+          { label: 'Frontend / Blockchain hooks', color: COLORS.primary.fill },
+          { label: 'Backend / Data layer',        color: COLORS.accent.fill },
+          { label: 'Ethereum / Smart Contract',   color: COLORS.warning.fill },
+          { label: 'Dashed = secondary link',     color: COLORS.muted.fill },
+        ].map(l => (
+          <div key={l.label} className="flex items-center gap-2">
+            <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: l.color }} />
+            <span className="text-muted-foreground">{l.label}</span>
           </div>
         ))}
       </div>
