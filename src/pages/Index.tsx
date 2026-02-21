@@ -16,6 +16,7 @@ const RecordDataForm = lazy(() => import('@/components/RecordDataForm').then(m =
 const VerificationView = lazy(() => import('@/components/VerificationView').then(m => ({ default: m.VerificationView })));
 const AdminView = lazy(() => import('@/components/AdminView').then(m => ({ default: m.AdminView })));
 const PerformanceView = lazy(() => import('@/components/PerformanceView').then(m => ({ default: m.PerformanceView })));
+const ArchitectureView = lazy(() => import('@/components/ArchitectureView').then(m => ({ default: m.ArchitectureView })));
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -78,6 +79,7 @@ const Index = () => {
         {activeTab === 'permissions' && <PermissionsView onShowAuth={handleShowAuth} />}
         {activeTab === 'performance' && <PerformanceView onShowAuth={handleShowAuth} />}
         {activeTab === 'admin' && <AdminView onShowAuth={handleShowAuth} />}
+        {activeTab === 'architecture' && <ArchitectureView onShowAuth={handleShowAuth} />}
       </Suspense>
     );
   }, [activeTab, showAuth, handleShowAuth, handleAuthSuccess]);

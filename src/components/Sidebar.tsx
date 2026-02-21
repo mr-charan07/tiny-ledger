@@ -10,7 +10,8 @@ import {
   Database,
   CheckCircle,
   ShieldCheck,
-  Gauge
+  Gauge,
+  Layers
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -28,6 +29,7 @@ const navItems = [
   { id: 'devices', label: 'IoT Devices', icon: Cpu },
   { id: 'permissions', label: 'Permissions', icon: Shield },
   { id: 'performance', label: 'Performance', icon: Gauge },
+  { id: 'architecture', label: 'Architecture', icon: Layers },
 ];
 
 const adminItems = [
