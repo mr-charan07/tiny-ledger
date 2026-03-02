@@ -5,6 +5,7 @@ import { DeviceCard } from './DeviceCard';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Plus, Search, RefreshCw, Wallet, AlertCircle, LogIn } from 'lucide-react';
+import { ApiInfoSection } from './ApiInfoSection';
 import {
   Dialog,
   DialogContent,
@@ -183,6 +184,12 @@ export function DevicesView({ onShowAuth }: DevicesViewProps) {
           </Dialog>
         </div>
       </div>
+
+      {/* API Info */}
+      <ApiInfoSection
+        deviceAddress={devices[0]?.address}
+        deviceName={devices[0]?.name}
+      />
 
       {devices.length > 0 ? (
         <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
