@@ -12,7 +12,7 @@ const BlocksView = lazy(() => import('@/components/BlocksView').then(m => ({ def
 const NodesView = lazy(() => import('@/components/NodesView').then(m => ({ default: m.NodesView })));
 const DevicesView = lazy(() => import('@/components/DevicesView').then(m => ({ default: m.DevicesView })));
 const PermissionsView = lazy(() => import('@/components/PermissionsView').then(m => ({ default: m.PermissionsView })));
-const RecordDataForm = lazy(() => import('@/components/RecordDataForm').then(m => ({ default: m.RecordDataForm })));
+const DatasetUpload = lazy(() => import('@/components/DatasetUpload').then(m => ({ default: m.DatasetUpload })));
 const VerificationView = lazy(() => import('@/components/VerificationView').then(m => ({ default: m.VerificationView })));
 const AdminView = lazy(() => import('@/components/AdminView').then(m => ({ default: m.AdminView })));
 const PerformanceView = lazy(() => import('@/components/PerformanceView').then(m => ({ default: m.PerformanceView })));
@@ -71,7 +71,7 @@ const Index = () => {
     return (
       <Suspense fallback={<LoadingFallback />}>
         {activeTab === 'dashboard' && <Dashboard onShowAuth={handleShowAuth} />}
-        {activeTab === 'record' && <RecordDataForm onShowAuth={handleShowAuth} />}
+        {activeTab === 'upload' && <DatasetUpload onShowAuth={handleShowAuth} />}
         {activeTab === 'verify' && <VerificationView onShowAuth={handleShowAuth} />}
         {activeTab === 'blocks' && <BlocksView onShowAuth={handleShowAuth} />}
         {activeTab === 'nodes' && <NodesView onShowAuth={handleShowAuth} />}
