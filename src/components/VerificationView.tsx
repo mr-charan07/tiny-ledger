@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, CheckCircle, XCircle, FileText, Shield, Hash, Clock, LogIn } from 'lucide-react';
+import { Search, CheckCircle, XCircle, FileText, Shield, Hash, Clock, LogIn, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -7,11 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { useData } from '@/hooks/useData';
 import { validateToken } from '@/lib/validation';
 import { formatTokenForDisplay } from '@/lib/tokenGeneration';
+import { regenerateHashForVerification } from '@/lib/datasetParser';
 import { toast } from 'sonner';
 import { getEtherscanLink } from '@/config/blockchain';
 
 interface VerificationResult {
   verified: boolean;
+  tampered: boolean;
   recordId?: string;
   deviceName?: string;
   dataType?: string;
@@ -19,6 +21,8 @@ interface VerificationResult {
   timestamp?: Date;
   signature?: string;
   blockHash?: string;
+  storedHash?: string;
+  regeneratedHash?: string;
 }
 
 interface VerificationViewProps {
@@ -64,26 +68,50 @@ export function VerificationView({ onShowAuth }: VerificationViewProps) {
         const dataKeys = Object.keys(matchedTx.data).filter(k => k !== 'hash');
         const dataType = dataKeys[0] || 'unknown';
         const dataValue = matchedTx.data[dataType];
-        
+        const storedHash = typeof matchedTx.data?.hash === 'string' ? matchedTx.data.hash : '';
+
+        // Tampering detection: regenerate hash from raw data and compare
+        let tampered = false;
+        let regeneratedHash = '';
+        const rawData = matchedTx.data as Record<string, unknown>;
+        if (rawData.deviceName && rawData.dataType && typeof rawData.value === 'number') {
+          regeneratedHash = regenerateHashForVerification(
+            String(rawData.deviceName),
+            String(rawData.dataType),
+            Number(rawData.value),
+            rawData.timestamp ? String(rawData.timestamp) : matchedTx.timestamp.toISOString()
+          );
+          if (storedHash && regeneratedHash !== storedHash) {
+            tampered = true;
+          }
+        }
+
         setVerificationResult({
           verified: true,
+          tampered,
           recordId: matchedTx.id,
           deviceName: matchedTx.deviceName,
           dataType,
           value: typeof dataValue === 'number' ? dataValue : undefined,
           timestamp: matchedTx.timestamp,
           signature: matchedTx.signature,
+          storedHash,
+          regeneratedHash,
         });
-        toast.success('Token verified successfully');
+        if (tampered) {
+          toast.warning('Data may have been tampered with!');
+        } else {
+          toast.success('Token verified successfully');
+        }
       } else {
-        setVerificationResult({ verified: false });
+        setVerificationResult({ verified: false, tampered: false });
         toast.error('Token verification failed', {
           description: 'No matching record found'
         });
       }
     } catch (error) {
       console.error('Verification error:', error);
-      setVerificationResult({ verified: false });
+      setVerificationResult({ verified: false, tampered: false });
       toast.error('Verification failed');
     } finally {
       setIsVerifying(false);
@@ -156,13 +184,24 @@ export function VerificationView({ onShowAuth }: VerificationViewProps) {
 
       {/* Verification Result */}
       {verificationResult && (
-        <Card className={verificationResult.verified 
-          ? 'border-accent/50 bg-accent/5' 
-          : 'border-destructive/50 bg-destructive/5'
+        <Card className={
+          verificationResult.tampered 
+            ? 'border-warning/50 bg-warning/5'
+            : verificationResult.verified 
+              ? 'border-accent/50 bg-accent/5' 
+              : 'border-destructive/50 bg-destructive/5'
         }>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              {verificationResult.verified ? (
+              {verificationResult.tampered ? (
+                <>
+                  <AlertTriangle className="h-5 w-5 text-warning" />
+                  <span className="text-warning">Tampering Detected</span>
+                  <Badge className="ml-2 bg-warning/20 text-warning border-warning/30">
+                    TAMPERED
+                  </Badge>
+                </>
+              ) : verificationResult.verified ? (
                 <>
                   <CheckCircle className="h-5 w-5 text-accent" />
                   <span className="text-accent">Verification Successful</span>
@@ -228,7 +267,42 @@ export function VerificationView({ onShowAuth }: VerificationViewProps) {
                   </div>
                 </div>
               </div>
-              
+              {/* Tampering Detection Detail */}
+              {verificationResult.tampered && (
+                <div className="p-4 rounded-lg bg-warning/10 border border-warning/30 space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-warning">
+                    <AlertTriangle className="h-4 w-4" />
+                    Integrity Check Failed — Hash Mismatch
+                  </div>
+                  <div className="text-xs space-y-1">
+                    <div>
+                      <span className="text-muted-foreground">Stored Hash: </span>
+                      <code className="font-mono text-foreground break-all">
+                        {verificationResult.storedHash}
+                      </code>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Regenerated Hash: </span>
+                      <code className="font-mono text-warning break-all">
+                        {verificationResult.regeneratedHash}
+                      </code>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    The stored data does not match its original hash. This record may have been modified after initial storage.
+                  </p>
+                </div>
+              )}
+
+              {!verificationResult.tampered && verificationResult.regeneratedHash && (
+                <div className="p-3 rounded-lg bg-accent/10 border border-accent/30">
+                  <div className="flex items-center gap-2 text-sm text-accent">
+                    <Shield className="h-4 w-4" />
+                    Integrity Verified — Hash matches stored proof
+                  </div>
+                </div>
+              )}
+
               <div className="pt-4 border-t border-border">
                 <a 
                   href={getEtherscanLink('tx', verificationResult.signature || '')}
