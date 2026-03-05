@@ -89,7 +89,7 @@ export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
 
         let recordId = Date.now() + record.index;
         let txHash: string | null = null;
-        let dataHash = record.hash;
+        const dataHash = record.hash;
 
         // Record on blockchain if available
         if (isContractDeployed && isConnected) {
@@ -101,11 +101,11 @@ export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
           if (result) {
             recordId = result.recordId;
             txHash = result.txHash;
-            dataHash = result.dataHash;
+            // Keep dataHash from dataset parser (canonical), not blockchain's hash
           }
         }
 
-        // Save to database
+        // Save to database — store the resolved timestamp used for hashing
         const saved = await saveDataRecord(recordId, deviceAddress, dataHash, txHash, {
           temperature: record.parsed.data_type === 'temperature' ? record.parsed.value : undefined,
           humidity: record.parsed.data_type === 'humidity' ? record.parsed.value : undefined,
