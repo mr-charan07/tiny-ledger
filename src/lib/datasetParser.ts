@@ -74,15 +74,16 @@ function parseJSON(text: string): Record<string, unknown>[] {
 /**
  * Generate a canonical Keccak-256 hash for a record
  */
-export function generateRecordHash(record: DatasetRecord): string {
+export function generateRecordHash(record: DatasetRecord): { hash: string; resolvedTimestamp: string } {
   // Canonical JSON: sorted keys, deterministic
+  const resolvedTimestamp = record.timestamp || new Date().toISOString();
   const canonical = JSON.stringify({
     data_type: record.data_type,
     device_name: record.device_name,
-    timestamp: record.timestamp || new Date().toISOString(),
+    timestamp: resolvedTimestamp,
     value: record.value,
   });
-  return keccak256(toUtf8Bytes(canonical));
+  return { hash: keccak256(toUtf8Bytes(canonical)), resolvedTimestamp };
 }
 
 /**
@@ -155,7 +156,9 @@ export function parseDatasetFile(
     }
 
     // Generate hash
-    const hash = generateRecordHash(result.data);
+    const { hash, resolvedTimestamp } = generateRecordHash(result.data);
+    // Store the resolved timestamp back so it can be persisted
+    result.data.timestamp = resolvedTimestamp;
 
     return {
       index,
