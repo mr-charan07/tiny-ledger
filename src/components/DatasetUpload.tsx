@@ -18,7 +18,7 @@ interface DatasetUploadProps {
 }
 
 export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
-  const { recordProof, isContractDeployed } = useBlockchain();
+  const { recordBatchProof, isContractDeployed } = useBlockchain();
   const { devices, saveDataRecord, isAuthenticated } = useData();
   const { isConnected, account } = useWeb3();
 
@@ -80,7 +80,25 @@ export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
     let failed = 0;
     const skipped = parseResult.invalidCount;
 
-    for (const record of validRecords) {
+    // Collect hashes and do a single blockchain transaction
+    let batchBlockchainResults: { recordId: number; txHash: string; dataHash: string }[] = [];
+
+    if (isContractDeployed && isConnected) {
+      const hashes = validRecords
+        .filter(r => r.hash)
+        .map(r => r.hash!);
+
+      if (hashes.length > 0) {
+        const result = await recordBatchProof(hashes);
+        if (result) {
+          batchBlockchainResults = result.results;
+        }
+      }
+    }
+
+    // Save each record to the database
+    for (let i = 0; i < validRecords.length; i++) {
+      const record = validRecords[i];
       if (!record.parsed || !record.hash) continue;
 
       try {
@@ -91,21 +109,12 @@ export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
         let txHash: string | null = null;
         const dataHash = record.hash;
 
-        // Record on blockchain if available
-        if (isContractDeployed && isConnected) {
-          const result = await recordProof(
-            record.parsed.device_name,
-            record.parsed.data_type,
-            record.parsed.value
-          );
-          if (result) {
-            recordId = result.recordId;
-            txHash = result.txHash;
-            // Keep dataHash from dataset parser (canonical), not blockchain's hash
-          }
+        // Use blockchain result if available
+        if (batchBlockchainResults.length > i) {
+          recordId = batchBlockchainResults[i].recordId;
+          txHash = batchBlockchainResults[i].txHash;
         }
 
-        // Save to database — store the resolved timestamp used for hashing
         const saved = await saveDataRecord(recordId, deviceAddress, dataHash, txHash, {
           temperature: record.parsed.data_type === 'temperature' ? record.parsed.value : undefined,
           humidity: record.parsed.data_type === 'humidity' ? record.parsed.value : undefined,
@@ -135,8 +144,6 @@ export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
 
     setBatchResults({ success, failed, skipped });
     setIsProcessing(false);
-
-    // Update parseResult to reflect status changes
     setParseResult({ ...parseResult });
 
     if (failed === 0) {
@@ -144,7 +151,7 @@ export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
     } else {
       toast.warning(`Processed ${success} records, ${failed} failed`);
     }
-  }, [parseResult, devices, account, isContractDeployed, isConnected, recordProof, saveDataRecord]);
+  }, [parseResult, devices, account, isContractDeployed, isConnected, recordBatchProof, saveDataRecord]);
 
   const downloadSampleCSV = () => {
     const csv = `device_name,data_type,value,timestamp

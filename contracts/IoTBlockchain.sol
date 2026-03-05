@@ -21,13 +21,24 @@ contract IoTBlockchain {
         owner = msg.sender;
     }
 
-    /// @notice Record a data hash on-chain
+    /// @notice Record a single data hash on-chain
     /// @param _hash The keccak256 hash of the data
     /// @return id The record ID
     function record(bytes32 _hash) external returns (uint256 id) {
         unchecked { recordCount++; }
         id = recordCount;
         emit DataRecorded(id, msg.sender, _hash);
+    }
+
+    /// @notice Record multiple data hashes in a single transaction
+    /// @param _hashes Array of keccak256 hashes
+    /// @return startId The first record ID assigned
+    function recordBatch(bytes32[] calldata _hashes) external returns (uint256 startId) {
+        startId = recordCount + 1;
+        for (uint256 i = 0; i < _hashes.length; i++) {
+            unchecked { recordCount++; }
+            emit DataRecorded(recordCount, msg.sender, _hashes[i]);
+        }
     }
 
     /// @notice Transfer ownership
