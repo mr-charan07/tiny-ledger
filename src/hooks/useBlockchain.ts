@@ -58,7 +58,7 @@ export function useBlockchain() {
     };
   }, [provider, signer, isCorrectNetwork]);
 
-  // Record data hash on-chain and return the record ID + tx hash
+  // Record a single data hash on-chain
   const recordProof = useCallback(
     async (
       deviceName: string,
@@ -72,13 +72,11 @@ export function useBlockchain() {
 
       try {
         setIsLoading(true);
-        // Create a hash from the data
         const dataHash = keccak256(toUtf8Bytes(`${deviceName}|${dataType}|${value}|${Date.now()}`));
         const tx = await contract.record(dataHash);
         toast.info('Transaction submitted', { description: 'Waiting for confirmation...' });
         const receipt = await tx.wait();
 
-        // Parse the DataRecorded event to get the record ID
         const event = receipt.logs.find((log: { topics: string[] }) =>
           log.topics[0] === contract.interface.getEvent('DataRecorded')?.topicHash
         );
@@ -97,11 +95,7 @@ export function useBlockchain() {
         setRecordCount(recordId);
         toast.success('Proof recorded on blockchain');
 
-        return {
-          recordId,
-          txHash: receipt.hash,
-          dataHash,
-        };
+        return { recordId, txHash: receipt.hash, dataHash };
       } catch (error: unknown) {
         console.error('Error recording proof:', error);
         const err = error as { reason?: string };
@@ -114,10 +108,68 @@ export function useBlockchain() {
     [contract, signer, recordCount]
   );
 
+  // Record multiple data hashes in a single transaction (single MetaMask confirmation)
+  const recordBatchProof = useCallback(
+    async (
+      hashes: string[]
+    ): Promise<{ results: { recordId: number; txHash: string; dataHash: string }[] } | null> => {
+      if (!contract || !signer) {
+        toast.error('Wallet not connected');
+        return null;
+      }
+
+      if (hashes.length === 0) return null;
+
+      try {
+        setIsLoading(true);
+        toast.info(`Submitting ${hashes.length} proofs in one transaction...`);
+
+        const tx = await contract.recordBatch(hashes);
+        toast.info('Transaction submitted', { description: 'Waiting for confirmation...' });
+        const receipt = await tx.wait();
+
+        const topicHash = contract.interface.getEvent('DataRecorded')?.topicHash;
+        const results: { recordId: number; txHash: string; dataHash: string }[] = [];
+
+        for (const log of receipt.logs) {
+          if (log.topics[0] === topicHash) {
+            const parsed = contract.interface.parseLog({
+              topics: log.topics as string[],
+              data: log.data,
+            });
+            if (parsed) {
+              results.push({
+                recordId: Number(parsed.args[0]),
+                txHash: receipt.hash,
+                dataHash: parsed.args[2],
+              });
+            }
+          }
+        }
+
+        if (results.length > 0) {
+          setRecordCount(results[results.length - 1].recordId);
+        }
+
+        toast.success(`${results.length} proofs recorded on blockchain`);
+        return { results };
+      } catch (error: unknown) {
+        console.error('Error recording batch proof:', error);
+        const err = error as { reason?: string };
+        toast.error('Failed to record batch proof', { description: err.reason || 'Transaction failed' });
+        return null;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [contract, signer]
+  );
+
   return {
     isLoading,
     isContractDeployed,
     recordCount,
     recordProof,
+    recordBatchProof,
   };
 }

@@ -30,6 +30,7 @@ export const CONTRACT_ABI = [
 
   // Write functions
   "function record(bytes32 _hash) returns (uint256)",
+  "function recordBatch(bytes32[] _hashes) returns (uint256)",
   "function transferOwnership(address _newOwner)",
 ] as const;
 
