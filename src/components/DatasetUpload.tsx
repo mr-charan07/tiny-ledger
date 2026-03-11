@@ -117,7 +117,7 @@ export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
       const device = devices.find(d => d.name === record.parsed!.device_name);
       const deviceAddress = device?.address || account || '0x0';
 
-      let recordId = Date.now() + record.index;
+      let recordId = Date.now() * 1000 + i;
       let txHash: string | null = null;
 
       if (batchBlockchainResults.length > i) {
