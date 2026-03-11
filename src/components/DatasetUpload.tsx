@@ -19,7 +19,7 @@ interface DatasetUploadProps {
 
 export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
   const { recordBatchProof, isContractDeployed } = useBlockchain();
-  const { devices, saveDataRecord, isAuthenticated } = useData();
+  const { devices, saveBatchRecords, isAuthenticated } = useData();
   const { isConnected, account } = useWeb3();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
