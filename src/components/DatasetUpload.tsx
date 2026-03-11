@@ -19,7 +19,7 @@ interface DatasetUploadProps {
 
 export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
   const { recordBatchProof, isContractDeployed } = useBlockchain();
-  const { devices, saveDataRecord, isAuthenticated } = useData();
+  const { devices, saveBatchRecords, isAuthenticated } = useData();
   const { isConnected, account } = useWeb3();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -96,51 +96,64 @@ export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
       }
     }
 
-    // Save each record to the database
+    // Build all records for batch insert
+    const recordsToSave: {
+      recordId: number;
+      deviceAddress: string;
+      dataHash: string;
+      txHash: string | null;
+      temperature?: number;
+      humidity?: number;
+      raw?: Record<string, unknown>;
+    }[] = [];
+
     for (let i = 0; i < validRecords.length; i++) {
       const record = validRecords[i];
-      if (!record.parsed || !record.hash) continue;
-
-      try {
-        const device = devices.find(d => d.name === record.parsed!.device_name);
-        const deviceAddress = device?.address || account || '0x0';
-
-        let recordId = Date.now() + record.index;
-        let txHash: string | null = null;
-        const dataHash = record.hash;
-
-        // Use blockchain result if available
-        if (batchBlockchainResults.length > i) {
-          recordId = batchBlockchainResults[i].recordId;
-          txHash = batchBlockchainResults[i].txHash;
-        }
-
-        const saved = await saveDataRecord(recordId, deviceAddress, dataHash, txHash, {
-          temperature: record.parsed.data_type === 'temperature' ? record.parsed.value : undefined,
-          humidity: record.parsed.data_type === 'humidity' ? record.parsed.value : undefined,
-          raw: {
-            deviceName: record.parsed.device_name,
-            dataType: record.parsed.data_type,
-            value: record.parsed.value,
-            timestamp: record.parsed.timestamp,
-            batchUpload: true,
-          },
-        });
-
-        if (saved) {
-          record.status = 'processed';
-          success++;
-        } else {
-          record.status = 'failed';
-          failed++;
-        }
-      } catch {
+      if (!record.parsed || !record.hash) {
         record.status = 'failed';
-        failed++;
+        continue;
       }
 
-      setProcessedCount(prev => prev + 1);
+      const device = devices.find(d => d.name === record.parsed!.device_name);
+      const deviceAddress = device?.address || account || '0x0';
+
+      let recordId = Date.now() + record.index;
+      let txHash: string | null = null;
+
+      if (batchBlockchainResults.length > i) {
+        recordId = batchBlockchainResults[i].recordId;
+        txHash = batchBlockchainResults[i].txHash;
+      }
+
+      recordsToSave.push({
+        recordId,
+        deviceAddress,
+        dataHash: record.hash,
+        txHash,
+        temperature: record.parsed.data_type === 'temperature' ? record.parsed.value : undefined,
+        humidity: record.parsed.data_type === 'humidity' ? record.parsed.value : undefined,
+        raw: {
+          deviceName: record.parsed.device_name,
+          dataType: record.parsed.data_type,
+          value: record.parsed.value,
+          timestamp: record.parsed.timestamp,
+          batchUpload: true,
+        },
+      });
     }
+
+    // Single batch insert
+    const result = await saveBatchRecords(recordsToSave);
+    success = result.success;
+    failed = result.failed;
+
+    // Update record statuses
+    validRecords.forEach(r => {
+      if (r.parsed && r.hash) {
+        r.status = success > 0 ? 'processed' : 'failed';
+      }
+    });
+    setProcessedCount(validRecords.length);
 
     setBatchResults({ success, failed, skipped });
     setIsProcessing(false);
@@ -151,7 +164,7 @@ export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
     } else {
       toast.warning(`Processed ${success} records, ${failed} failed`);
     }
-  }, [parseResult, devices, account, isContractDeployed, isConnected, recordBatchProof, saveDataRecord]);
+  }, [parseResult, devices, account, isContractDeployed, isConnected, recordBatchProof, saveBatchRecords]);
 
   const downloadSampleCSV = () => {
     const csv = `device_name,data_type,value,timestamp

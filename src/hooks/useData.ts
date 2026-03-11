@@ -347,6 +347,63 @@ export function useData() {
     [userId, fetchData]
   );
 
+  // Batch save multiple data records in a single insert (no per-record fetchData)
+  const saveBatchRecords = useCallback(
+    async (
+      records: {
+        recordId: number;
+        deviceAddress: string;
+        dataHash: string;
+        txHash: string | null;
+        temperature?: number;
+        humidity?: number;
+        raw?: Record<string, unknown>;
+      }[]
+    ): Promise<{ success: number; failed: number }> => {
+      if (!userId) {
+        toast.error('Please sign in first');
+        return { success: 0, failed: records.length };
+      }
+
+      const insertData: TablesInsert<'data_records'>[] = records.map(r => ({
+        record_id: r.recordId,
+        device_address: r.deviceAddress,
+        data_hash: r.dataHash,
+        tx_hash: r.txHash,
+        temperature: r.temperature ?? null,
+        humidity: r.humidity ?? null,
+        raw_data: r.raw ? JSON.parse(JSON.stringify(r.raw)) : null,
+        user_id: userId,
+      }));
+
+      try {
+        const chunkSize = 500;
+        let success = 0;
+        let failed = 0;
+
+        for (let i = 0; i < insertData.length; i += chunkSize) {
+          const chunk = insertData.slice(i, i + chunkSize);
+          const { error } = await supabase.from('data_records').insert(chunk);
+          if (error) {
+            console.error('Batch insert error:', error);
+            failed += chunk.length;
+          } else {
+            success += chunk.length;
+          }
+        }
+
+        await fetchData();
+        return { success, failed };
+      } catch (error: unknown) {
+        console.error('Error batch saving records:', error);
+        const err = error as { message?: string };
+        toast.error('Failed to save records', { description: err.message });
+        return { success: 0, failed: records.length };
+      }
+    },
+    [userId, fetchData]
+  );
+
   return {
     isLoading,
     isAuthenticated: !!userId,
@@ -360,5 +417,6 @@ export function useData() {
     registerDevice,
     registerNode,
     saveDataRecord,
+    saveBatchRecords,
   };
 }
