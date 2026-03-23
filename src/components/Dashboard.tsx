@@ -1,4 +1,5 @@
-import { memo } from 'react';
+import { memo, useEffect, useRef } from 'react';
+import { usePerformance } from '@/contexts/PerformanceContext';
 import { useData } from '@/hooks/useData';
 import { useBlockchain } from '@/hooks/useBlockchain';
 import { useWeb3 } from '@/contexts/Web3Context';
