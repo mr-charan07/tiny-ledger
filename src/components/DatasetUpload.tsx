@@ -78,6 +78,7 @@ export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
 
     setIsProcessing(true);
     setProcessedCount(0);
+    const batchStart = performance.now();
     let success = 0;
     let failed = 0;
     const skipped = parseResult.invalidCount;
