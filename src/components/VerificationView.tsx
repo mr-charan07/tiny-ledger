@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useData } from '@/hooks/useData';
+import { usePerformance } from '@/contexts/PerformanceContext';
 import { validateToken } from '@/lib/validation';
 import { formatTokenForDisplay } from '@/lib/tokenGeneration';
 import { regenerateHashForVerification } from '@/lib/datasetParser';
