@@ -153,7 +153,14 @@ export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
     }
 
     // Single batch insert
+    const dbStart = performance.now();
     const result = await saveBatchRecords(recordsToSave);
+    const dbDuration = performance.now() - dbStart;
+    recordMetric('api_call', 'database_batch_save', dbDuration, {
+      type: 'database_batch',
+      recordCount: recordsToSave.length,
+      success: result.failed === 0,
+    });
     success = result.success;
     failed = result.failed;
 
