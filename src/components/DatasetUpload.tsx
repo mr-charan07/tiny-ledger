@@ -22,6 +22,7 @@ export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
   const { recordBatchProof, isContractDeployed } = useBlockchain();
   const { devices, saveBatchRecords, isAuthenticated } = useData();
   const { isConnected, account } = useWeb3();
+  const { recordMetric } = usePerformance();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [parseResult, setParseResult] = useState<DatasetParseResult | null>(null);
