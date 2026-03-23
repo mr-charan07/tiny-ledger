@@ -98,27 +98,33 @@ const IndexContent = () => {
   }, [activeTab, showAuth, handleShowAuth, handleAuthSuccess]);
 
   return (
-    <Web3Provider>
-      <div className="min-h-screen bg-background grid-pattern">
-        <Header 
-          isAuthenticated={isAuthenticated} 
-          onShowAuth={handleShowAuth}
+    <div className="min-h-screen bg-background grid-pattern">
+      <Header 
+        isAuthenticated={isAuthenticated} 
+        onShowAuth={handleShowAuth}
+      />
+      <div className="flex">
+        <Sidebar 
+          activeTab={activeTab} 
+          onTabChange={handleTabChange}
+          isAdmin={isAdmin}
         />
-        <div className="flex">
-          <Sidebar 
-            activeTab={activeTab} 
-            onTabChange={handleTabChange}
-            isAdmin={isAdmin}
-          />
-          <main className="flex-1 p-6 overflow-auto">
-            <div className="max-w-7xl mx-auto">
-              {content}
-            </div>
-          </main>
-        </div>
+        <main className="flex-1 p-6 overflow-auto">
+          <div className="max-w-7xl mx-auto">
+            {content}
+          </div>
+        </main>
       </div>
-    </Web3Provider>
+    </div>
   );
 };
+
+const Index = () => (
+  <Web3Provider>
+    <PerformanceProvider>
+      <IndexContent />
+    </PerformanceProvider>
+  </Web3Provider>
+);
 
 export default Index;

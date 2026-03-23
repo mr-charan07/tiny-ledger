@@ -191,7 +191,7 @@ export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
     } else {
       toast.warning(`Processed ${success} records, ${failed} failed`);
     }
-  }, [parseResult, devices, account, isContractDeployed, isConnected, recordBatchProof, saveBatchRecords]);
+  }, [parseResult, devices, account, isContractDeployed, isConnected, recordBatchProof, saveBatchRecords, recordMetric]);
 
   const downloadSampleCSV = () => {
     const csv = `device_name,data_type,value,timestamp

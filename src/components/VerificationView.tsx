@@ -117,6 +117,11 @@ export function VerificationView({ onShowAuth }: VerificationViewProps) {
       setVerificationResult({ verified: false, tampered: false });
       toast.error('Verification failed');
     } finally {
+      const verifyDuration = performance.now() - verifyStart;
+      recordMetric('api_call', 'token_verification', verifyDuration, {
+        success: verificationResult?.verified ?? false,
+        tampered: verificationResult?.tampered ?? false,
+      });
       setIsVerifying(false);
     }
   };
