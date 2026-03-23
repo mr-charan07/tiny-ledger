@@ -1,6 +1,8 @@
-import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Web3Provider } from '@/contexts/Web3Context';
+import { PerformanceProvider } from '@/contexts/PerformanceContext';
+import { usePerformance } from '@/contexts/PerformanceContext';
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
 import { AuthForm } from '@/components/AuthForm';
@@ -27,11 +29,13 @@ const LoadingFallback = () => (
     </div>
   </div>
 );
-const Index = () => {
+const IndexContent = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showAuth, setShowAuth] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { isAdmin } = useAdmin();
+  const { recordMetric } = usePerformance();
+  const tabSwitchTime = useRef<number>(0);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -50,6 +54,15 @@ const Index = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Track page load time when tab changes
+  useEffect(() => {
+    if (tabSwitchTime.current > 0) {
+      const loadTime = performance.now() - tabSwitchTime.current;
+      recordMetric('page_load', `view_${activeTab}`, loadTime, { tab: activeTab });
+      tabSwitchTime.current = 0;
+    }
+  }, [activeTab, recordMetric]);
+
   const handleShowAuth = useCallback(() => {
     setShowAuth(true);
   }, []);
@@ -59,6 +72,7 @@ const Index = () => {
   }, []);
 
   const handleTabChange = useCallback((tab: string) => {
+    tabSwitchTime.current = performance.now();
     setShowAuth(false);
     setActiveTab(tab);
   }, []);
@@ -84,27 +98,33 @@ const Index = () => {
   }, [activeTab, showAuth, handleShowAuth, handleAuthSuccess]);
 
   return (
-    <Web3Provider>
-      <div className="min-h-screen bg-background grid-pattern">
-        <Header 
-          isAuthenticated={isAuthenticated} 
-          onShowAuth={handleShowAuth}
+    <div className="min-h-screen bg-background grid-pattern">
+      <Header 
+        isAuthenticated={isAuthenticated} 
+        onShowAuth={handleShowAuth}
+      />
+      <div className="flex">
+        <Sidebar 
+          activeTab={activeTab} 
+          onTabChange={handleTabChange}
+          isAdmin={isAdmin}
         />
-        <div className="flex">
-          <Sidebar 
-            activeTab={activeTab} 
-            onTabChange={handleTabChange}
-            isAdmin={isAdmin}
-          />
-          <main className="flex-1 p-6 overflow-auto">
-            <div className="max-w-7xl mx-auto">
-              {content}
-            </div>
-          </main>
-        </div>
+        <main className="flex-1 p-6 overflow-auto">
+          <div className="max-w-7xl mx-auto">
+            {content}
+          </div>
+        </main>
       </div>
-    </Web3Provider>
+    </div>
   );
 };
+
+const Index = () => (
+  <Web3Provider>
+    <PerformanceProvider>
+      <IndexContent />
+    </PerformanceProvider>
+  </Web3Provider>
+);
 
 export default Index;

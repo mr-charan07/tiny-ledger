@@ -1,4 +1,5 @@
-import { memo } from 'react';
+import { memo, useEffect, useRef } from 'react';
+import { usePerformance } from '@/contexts/PerformanceContext';
 import { useData } from '@/hooks/useData';
 import { useBlockchain } from '@/hooks/useBlockchain';
 import { useWeb3 } from '@/contexts/Web3Context';
@@ -20,6 +21,18 @@ export const Dashboard = memo(function Dashboard({ onShowAuth }: DashboardProps)
   const { isConnected, isCorrectNetwork, connectWallet, switchToSepolia } = useWeb3();
   const { isContractDeployed } = useBlockchain();
   const { stats, blocks, nodes, devices, transactions, isLoading, isAuthenticated } = useData();
+  const { recordMetric } = usePerformance();
+  const renderStart = useRef(performance.now());
+
+  // Track render time on mount
+  useEffect(() => {
+    const renderTime = performance.now() - renderStart.current;
+    recordMetric('render', 'dashboard_render', renderTime, {
+      hasStats: !!stats,
+      blocksCount: blocks.length,
+      devicesCount: devices.length,
+    });
+  }, []); // Only on mount
 
   // Not authenticated state
   if (!isAuthenticated) {

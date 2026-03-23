@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useData } from '@/hooks/useData';
+import { usePerformance } from '@/contexts/PerformanceContext';
 import { validateToken } from '@/lib/validation';
 import { formatTokenForDisplay } from '@/lib/tokenGeneration';
 import { regenerateHashForVerification } from '@/lib/datasetParser';
@@ -31,6 +32,7 @@ interface VerificationViewProps {
 
 export function VerificationView({ onShowAuth }: VerificationViewProps) {
   const { transactions, isAuthenticated } = useData();
+  const { recordMetric } = usePerformance();
   const [searchToken, setSearchToken] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
@@ -46,6 +48,7 @@ export function VerificationView({ onShowAuth }: VerificationViewProps) {
     }
 
     setIsVerifying(true);
+    const verifyStart = performance.now();
     
     try {
       // Simulate verification delay for UX
@@ -114,6 +117,11 @@ export function VerificationView({ onShowAuth }: VerificationViewProps) {
       setVerificationResult({ verified: false, tampered: false });
       toast.error('Verification failed');
     } finally {
+      const verifyDuration = performance.now() - verifyStart;
+      recordMetric('api_call', 'token_verification', verifyDuration, {
+        success: verificationResult?.verified ?? false,
+        tampered: verificationResult?.tampered ?? false,
+      });
       setIsVerifying(false);
     }
   };

@@ -10,6 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { useBlockchain } from '@/hooks/useBlockchain';
 import { useData } from '@/hooks/useData';
 import { useWeb3 } from '@/contexts/Web3Context';
+import { usePerformance } from '@/contexts/PerformanceContext';
 import { parseDatasetFile, type DatasetParseResult, type ParsedRecord } from '@/lib/datasetParser';
 import { toast } from 'sonner';
 
@@ -21,6 +22,7 @@ export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
   const { recordBatchProof, isContractDeployed } = useBlockchain();
   const { devices, saveBatchRecords, isAuthenticated } = useData();
   const { isConnected, account } = useWeb3();
+  const { recordMetric } = usePerformance();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [parseResult, setParseResult] = useState<DatasetParseResult | null>(null);
@@ -76,6 +78,7 @@ export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
 
     setIsProcessing(true);
     setProcessedCount(0);
+    const batchStart = performance.now();
     let success = 0;
     let failed = 0;
     const skipped = parseResult.invalidCount;
@@ -89,7 +92,14 @@ export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
         .map(r => r.hash!);
 
       if (hashes.length > 0) {
+        const bcStart = performance.now();
         const result = await recordBatchProof(hashes);
+        const bcDuration = performance.now() - bcStart;
+        recordMetric('api_call', 'blockchain_batch_proof', bcDuration, {
+          type: 'blockchain',
+          recordCount: hashes.length,
+          success: !!result,
+        });
         if (result) {
           batchBlockchainResults = result.results;
         }
@@ -143,7 +153,14 @@ export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
     }
 
     // Single batch insert
+    const dbStart = performance.now();
     const result = await saveBatchRecords(recordsToSave);
+    const dbDuration = performance.now() - dbStart;
+    recordMetric('api_call', 'database_batch_save', dbDuration, {
+      type: 'database_batch',
+      recordCount: recordsToSave.length,
+      success: result.failed === 0,
+    });
     success = result.success;
     failed = result.failed;
 
@@ -155,6 +172,16 @@ export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
     });
     setProcessedCount(validRecords.length);
 
+    // Record total batch processing time
+    const totalDuration = performance.now() - batchStart;
+    recordMetric('interaction', 'batch_process', totalDuration, {
+      totalRecords: validRecords.length,
+      success,
+      failed,
+      skipped,
+      hasBlockchain: isContractDeployed && isConnected,
+    });
+
     setBatchResults({ success, failed, skipped });
     setIsProcessing(false);
     setParseResult({ ...parseResult });
@@ -164,7 +191,7 @@ export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
     } else {
       toast.warning(`Processed ${success} records, ${failed} failed`);
     }
-  }, [parseResult, devices, account, isContractDeployed, isConnected, recordBatchProof, saveBatchRecords]);
+  }, [parseResult, devices, account, isContractDeployed, isConnected, recordBatchProof, saveBatchRecords, recordMetric]);
 
   const downloadSampleCSV = () => {
     const csv = `device_name,data_type,value,timestamp
