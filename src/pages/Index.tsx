@@ -29,11 +29,13 @@ const LoadingFallback = () => (
     </div>
   </div>
 );
-const Index = () => {
+const IndexContent = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showAuth, setShowAuth] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { isAdmin } = useAdmin();
+  const { recordMetric } = usePerformance();
+  const tabSwitchTime = useRef<number>(0);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -52,6 +54,15 @@ const Index = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Track page load time when tab changes
+  useEffect(() => {
+    if (tabSwitchTime.current > 0) {
+      const loadTime = performance.now() - tabSwitchTime.current;
+      recordMetric('page_load', `view_${activeTab}`, loadTime, { tab: activeTab });
+      tabSwitchTime.current = 0;
+    }
+  }, [activeTab, recordMetric]);
+
   const handleShowAuth = useCallback(() => {
     setShowAuth(true);
   }, []);
@@ -61,6 +72,7 @@ const Index = () => {
   }, []);
 
   const handleTabChange = useCallback((tab: string) => {
+    tabSwitchTime.current = performance.now();
     setShowAuth(false);
     setActiveTab(tab);
   }, []);
