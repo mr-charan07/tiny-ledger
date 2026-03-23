@@ -32,6 +32,7 @@ interface VerificationViewProps {
 
 export function VerificationView({ onShowAuth }: VerificationViewProps) {
   const { transactions, isAuthenticated } = useData();
+  const { recordMetric } = usePerformance();
   const [searchToken, setSearchToken] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
