@@ -10,6 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { useBlockchain } from '@/hooks/useBlockchain';
 import { useData } from '@/hooks/useData';
 import { useWeb3 } from '@/contexts/Web3Context';
+import { usePerformance } from '@/contexts/PerformanceContext';
 import { parseDatasetFile, type DatasetParseResult, type ParsedRecord } from '@/lib/datasetParser';
 import { toast } from 'sonner';
 
