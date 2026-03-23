@@ -92,7 +92,14 @@ export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
         .map(r => r.hash!);
 
       if (hashes.length > 0) {
+        const bcStart = performance.now();
         const result = await recordBatchProof(hashes);
+        const bcDuration = performance.now() - bcStart;
+        recordMetric('api_call', 'blockchain_batch_proof', bcDuration, {
+          type: 'blockchain',
+          recordCount: hashes.length,
+          success: !!result,
+        });
         if (result) {
           batchBlockchainResults = result.results;
         }
