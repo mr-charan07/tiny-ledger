@@ -48,6 +48,7 @@ export function VerificationView({ onShowAuth }: VerificationViewProps) {
     }
 
     setIsVerifying(true);
+    const verifyStart = performance.now();
     
     try {
       // Simulate verification delay for UX
