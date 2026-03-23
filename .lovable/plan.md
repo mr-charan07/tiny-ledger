@@ -1,38 +1,40 @@
 
 
-## Batch Blockchain Proofs with Single MetaMask Confirmation
+# Plan: Instrument Performance Metrics Across the Application
 
-**Problem**: Currently, each record triggers a separate `contract.record(hash)` call, requiring a MetaMask confirmation per record. For 50 records, that's 50 confirmations.
+## Overview
+The Performance dashboard exists but shows empty charts because no tracking calls are made anywhere in the app. This plan adds real metric recording to 6 key areas so the dashboard populates with actual data.
 
-**Solution**: Add a `recordBatch(bytes32[])` function to the smart contract and a corresponding frontend method, so all hashes are submitted in one transaction with one MetaMask confirmation.
+## Changes
 
-### Changes
+### 1. Create Performance Context (`src/contexts/PerformanceContext.tsx`)
+- New React context wrapping `usePerformanceMetrics` hook
+- Provides `startTimer`, `endTimer`, `recordMetric` globally
+- Wrap the app with this provider in `Index.tsx`
 
-**1. Update Smart Contract (`contracts/IoTBlockchain.sol`)**
-Add a `recordBatch` function that accepts an array of hashes and emits events for each:
-```solidity
-function recordBatch(bytes32[] calldata _hashes) external returns (uint256 startId) {
-    startId = recordCount + 1;
-    for (uint256 i = 0; i < _hashes.length; i++) {
-        unchecked { recordCount++; }
-        emit DataRecorded(recordCount, msg.sender, _hashes[i]);
-    }
-}
-```
-> **Note**: This requires redeploying the contract to Sepolia and updating the contract address.
+### 2. Instrument Database API Calls (`src/hooks/useData.ts`)
+- Import and use the performance context
+- In `fetchData`: wrap the 4 parallel queries with `startTimer`/`endTimer`, record as `api_call` with metadata `{ table, success, rowCount }`
+- In `saveBatchRecords`: time the insert operation, record as `api_call`
+- In `saveDataRecord`, `saveDevice`, `saveNode`: time each call
 
-**2. Update Contract ABI (`src/config/blockchain.ts`)**
-Add the new `recordBatch` function signature to `CONTRACT_ABI`.
+### 3. Instrument Page/View Loads (`src/pages/Index.tsx`)
+- On `activeTab` change, record a `page_load` metric measuring time from tab switch to render completion via `useEffect`
 
-**3. Add `recordBatchProof` to `src/hooks/useBlockchain.ts`**
-New function that collects all hashes into an array, calls `contract.recordBatch(hashes)` once, parses all `DataRecorded` events from the single receipt, and returns an array of `{ recordId, txHash, dataHash }`.
+### 4. Instrument Dataset Upload (`src/components/DatasetUpload.tsx`)
+- Time the full `handleBatchProcess` as an `interaction` metric (e.g. "batch_process")
+- Time blockchain transaction separately as `api_call` with metadata `{ type: 'blockchain', recordCount }`
+- Time database save as `api_call` with metadata `{ type: 'database_batch' }`
 
-**4. Update `src/components/DatasetUpload.tsx`**
-Refactor `handleBatchProcess`:
-- First pass: collect all valid record hashes into an array.
-- If blockchain is available, call `recordBatchProof(hashes)` once (single MetaMask confirm).
-- Second pass: save each record to the database with its corresponding `recordId` and the shared `txHash`.
+### 5. Instrument Verification (`src/components/VerificationView.tsx`)
+- Time the verification lookup as `api_call` with metadata `{ success, tampered }`
 
-### Important
-The smart contract must be redeployed with the new `recordBatch` function. After deploying, you'll need to update `CONTRACT_ADDRESS` in `src/config/blockchain.ts`.
+### 6. Instrument Dashboard Render (`src/components/Dashboard.tsx`)
+- Use `useEffect` + `performance.now()` to record `render` metric on mount
+
+## Technical Notes
+- Context avoids re-instantiating the hook in every component
+- All metrics flow to the existing `performance_metrics` table via the existing `usePerformanceMetrics` hook
+- No schema changes needed -- the table and PerformanceView charts already support all 4 metric types
+- Metrics include metadata (success status, table names, record counts) for the dashboard's success-rate and filtering features
 
