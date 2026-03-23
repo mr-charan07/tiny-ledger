@@ -1,6 +1,8 @@
-import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Web3Provider } from '@/contexts/Web3Context';
+import { PerformanceProvider } from '@/contexts/PerformanceContext';
+import { usePerformance } from '@/contexts/PerformanceContext';
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
 import { AuthForm } from '@/components/AuthForm';
