@@ -172,6 +172,16 @@ export function DatasetUpload({ onShowAuth }: DatasetUploadProps) {
     });
     setProcessedCount(validRecords.length);
 
+    // Record total batch processing time
+    const totalDuration = performance.now() - batchStart;
+    recordMetric('interaction', 'batch_process', totalDuration, {
+      totalRecords: validRecords.length,
+      success,
+      failed,
+      skipped,
+      hasBlockchain: isContractDeployed && isConnected,
+    });
+
     setBatchResults({ success, failed, skipped });
     setIsProcessing(false);
     setParseResult({ ...parseResult });
