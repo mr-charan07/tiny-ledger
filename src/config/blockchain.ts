@@ -17,7 +17,7 @@ export const SEPOLIA_NETWORK = {
 // ============================================
 // DEPLOY THE CONTRACT AND PASTE ADDRESS HERE
 // ============================================
-export const CONTRACT_ADDRESS = '0x8191606345cD570F33575F5514cC6B294C2df23b';
+export const CONTRACT_ADDRESS = '0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8';
 
 // Contract ABI - Ultra minimal proof-only contract
 export const CONTRACT_ABI = [
