@@ -140,24 +140,29 @@ export function Web3Provider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!window.ethereum) return;
 
-    const handleAccountsChanged = (accounts: string[]) => {
-      if (accounts.length === 0) {
+    const handleAccountsChanged = (...args: unknown[]) => {
+      const accounts = args[0] as string[];
+      if (!accounts || accounts.length === 0) {
         disconnectWallet();
       } else if (accounts[0] !== account) {
         setAccount(accounts[0]);
         if (provider) {
-          provider.getSigner().then(setSigner);
+          provider.getSigner().then(setSigner).catch(console.error);
         }
       }
     };
 
-    const handleChainChanged = (newChainId: string) => {
+    const handleChainChanged = (...args: unknown[]) => {
+      const newChainId = args[0] as string;
       setChainId(parseInt(newChainId, 16));
-      // Reload provider on chain change
-      if (account) {
-        const browserProvider = new BrowserProvider(window.ethereum);
-        setProvider(browserProvider);
-        browserProvider.getSigner().then(setSigner);
+      if (account && window.ethereum) {
+        try {
+          const browserProvider = new BrowserProvider(window.ethereum);
+          setProvider(browserProvider);
+          browserProvider.getSigner().then(setSigner).catch(console.error);
+        } catch (e) {
+          console.error('Error creating provider on chain change:', e);
+        }
       }
     };
 
@@ -168,21 +173,24 @@ export function Web3Provider({ children }: { children: ReactNode }) {
     if (!isManuallyDisconnected) {
       window.ethereum
         .request({ method: 'eth_accounts' })
-        .then((accounts: string[]) => {
-          if (accounts.length > 0) {
+        .then((result: unknown) => {
+          const accounts = result as string[];
+          if (accounts && accounts.length > 0 && window.ethereum) {
             const browserProvider = new BrowserProvider(window.ethereum);
             setAccount(accounts[0]);
             setProvider(browserProvider);
-            browserProvider.getSigner().then(setSigner);
-            updateChainId(browserProvider);
+            browserProvider.getSigner().then(setSigner).catch(console.error);
+            updateChainId(browserProvider).catch(console.error);
           }
         })
         .catch(console.error);
     }
 
     return () => {
-      window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-      window.ethereum.removeListener('chainChanged', handleChainChanged);
+      if (window.ethereum) {
+        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+        window.ethereum.removeListener('chainChanged', handleChainChanged);
+      }
     };
   }, [account, provider, disconnectWallet, updateChainId, isManuallyDisconnected]);
 
