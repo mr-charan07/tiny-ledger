@@ -96,9 +96,6 @@ export const Dashboard = memo(function Dashboard({ onShowAuth }: DashboardProps)
     );
   }
 
-  // Contract not deployed state (show warning but allow viewing DB data)
-  const showContractWarning = !isContractDeployed;
-
   // Loading state
   if (isLoading && !stats) {
     return (
@@ -113,20 +110,6 @@ export const Dashboard = memo(function Dashboard({ onShowAuth }: DashboardProps)
 
   return (
     <div className="space-y-6 animate-slide-in">
-      {/* Contract Warning */}
-      {showContractWarning && (
-        <div className="rounded-lg border border-warning/50 bg-warning/10 p-4">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-warning mt-0.5" />
-            <div>
-              <p className="text-sm font-medium text-warning">Smart Contract Not Deployed</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Deploy <code className="text-primary">contracts/IoTBlockchain.sol</code> to Sepolia and update the address in <code className="text-primary">src/config/blockchain.ts</code> to enable blockchain proofs.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
